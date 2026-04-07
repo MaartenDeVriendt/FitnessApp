@@ -4,8 +4,9 @@
 </div>
 
 <p class="hint">
-  Set which exercises you do on each weekday. This <strong>repeats every week</strong>. Logging happens on the
-  <a routerLink="/week">week view</a> (weights + last week + best ever per set).
+  Set which exercises you do on each weekday. This <strong>repeats every week</strong>. Add a <strong>name</strong> and optional
+  <strong>notes</strong> (form cues, reps scheme, equipment). Logging happens on the
+  <a routerLink="/week">week view</a>.
 </p>
 
 @if (message()) {
@@ -23,9 +24,28 @@
     } @else {
       <ul>
         @for (ex of draft()[day]; track ex.exerciseKey) {
-          <li>
-            <input type="text" [ngModel]="ex.name" (ngModelChange)="updateName(day, ex.exerciseKey, $event)" />
-            <button type="button" class="remove" (click)="removeExercise(day, ex.exerciseKey)">Remove</button>
+          <li class="ex-card">
+            <div class="ex-row">
+              <label class="field">
+                <span class="field-label">Name</span>
+                <input
+                  type="text"
+                  [ngModel]="ex.name"
+                  (ngModelChange)="updateName(day, ex.exerciseKey, $event)"
+                  placeholder="e.g. Back squat"
+                />
+              </label>
+              <button type="button" class="remove" (click)="removeExercise(day, ex.exerciseKey)">Remove</button>
+            </div>
+            <label class="field notes-field">
+              <span class="field-label">Notes</span>
+              <textarea
+                rows="2"
+                [ngModel]="ex.notes ?? ''"
+                (ngModelChange)="updateNotes(day, ex.exerciseKey, $event)"
+                placeholder="Optional: tempo, stance, target RPE, injuries to watch…"
+              ></textarea>
+            </label>
           </li>
         }
       </ul>

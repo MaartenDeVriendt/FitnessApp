@@ -88,17 +88,18 @@ export class WeeklyService {
 
   async saveProgram(program: WeeklyProgram): Promise<void> {
     const uid = this.requireUid();
+    const sanitized = this.sanitizeProgram(program);
     const d = doc(this.firestore, 'users', uid, SETTINGS_COLLECTION, WEEKLY_PROGRAM_DOC);
     await setDoc(
       d,
       {
-        monday: program.monday,
-        tuesday: program.tuesday,
-        wednesday: program.wednesday,
-        thursday: program.thursday,
-        friday: program.friday,
-        saturday: program.saturday,
-        sunday: program.sunday,
+        monday: sanitized.monday,
+        tuesday: sanitized.tuesday,
+        wednesday: sanitized.wednesday,
+        thursday: sanitized.thursday,
+        friday: sanitized.friday,
+        saturday: sanitized.saturday,
+        sunday: sanitized.sunday,
         updatedAt: serverTimestamp(),
       },
       { merge: true },
@@ -190,9 +191,13 @@ export class WeeklyService {
           .filter((x) => x && typeof (x as ProgramExerciseRaw).name === 'string')
           .map((x) => {
             const o = x as ProgramExerciseRaw;
+            const notesRaw = o.notes ?? o.description;
+            const notesTrimmed =
+              typeof notesRaw === 'string' && notesRaw.trim() ? notesRaw.trim() : undefined;
             return {
               exerciseKey: typeof o.exerciseKey === 'string' ? o.exerciseKey : crypto.randomUUID(),
               name: String(o.name).trim(),
+              ...(notesTrimmed ? { notes: notesTrimmed } : {}),
             };
           })
           .filter((x) => x.name.length > 0);
@@ -215,6 +220,24 @@ export class WeeklyService {
     };
   }
 
+  private sanitizeProgram(program: WeeklyProgram): WeeklyProgram {
+    const out: WeeklyProgram = structuredClone(EMPTY_WEEKLY_PROGRAM);
+    for (const day of DAYS) {
+      out[day] = program[day]
+        .map((e) => {
+          const name = e.name.trim();
+          const notes = e.notes?.trim();
+          return {
+            exerciseKey: e.exerciseKey,
+            name,
+            ...(notes ? { notes } : {}),
+          };
+        })
+        .filter((e) => e.name.length > 0);
+    }
+    return out;
+  }
+
   private requireUid(): string {
     const uid = this.auth.currentUser?.uid;
     if (!uid) throw new Error('You must be signed in.');
@@ -225,4 +248,7 @@ export class WeeklyService {
 interface ProgramExerciseRaw {
   exerciseKey?: string;
   name?: string;
+  notes?: string;
+  /** Legacy / alias if you ever stored this key */
+  description?: string;
 }

@@ -31,9 +31,7 @@ export class ProgramEditorComponent implements OnInit {
   }
 
   addExercise(day: DayOfWeek): void {
-    const name = prompt('Exercise name?');
-    if (!name?.trim()) return;
-    const row: ProgramExercise = { exerciseKey: crypto.randomUUID(), name: name.trim() };
+    const row: ProgramExercise = { exerciseKey: crypto.randomUUID(), name: '', notes: '' };
     this.draft.update((d) => ({
       ...d,
       [day]: [...d[day], row],
@@ -51,6 +49,13 @@ export class ProgramEditorComponent implements OnInit {
     this.draft.update((d) => ({
       ...d,
       [day]: d[day].map((e) => (e.exerciseKey === exerciseKey ? { ...e, name } : e)),
+    }));
+  }
+
+  updateNotes(day: DayOfWeek, exerciseKey: string, notes: string): void {
+    this.draft.update((d) => ({
+      ...d,
+      [day]: d[day].map((e) => (e.exerciseKey === exerciseKey ? { ...e, notes } : e)),
     }));
   }
 

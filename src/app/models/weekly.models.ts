@@ -5,6 +5,8 @@ import type { DayOfWeek } from '../weekly/weekly-utils';
 export interface ProgramExercise {
   exerciseKey: string;
   name: string;
+  /** Optional cues, form tips, equipment, etc. (stored in Firestore on the template). */
+  notes?: string;
 }
 
 /** Mon–Sun template: which exercises you plan on each day (repeats every week). */

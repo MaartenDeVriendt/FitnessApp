@@ -222,13 +222,29 @@ button.primary:disabled {
   padding-top: 0;
 }
 
-.exercise-block h3 {
-  margin: 0 0 0.85rem;
+.exercise-head {
+  margin-bottom: 0.85rem;
+}
+
+.exercise-head h3 {
+  margin: 0 0 0.35rem;
   font-size: 0.95rem;
   font-family: var(--font-display);
   font-weight: 600;
   color: var(--text);
   letter-spacing: -0.02em;
+}
+
+.ex-notes {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
 }
 
 .sets-grid {

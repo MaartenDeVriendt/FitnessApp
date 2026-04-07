@@ -35,7 +35,12 @@
     } @else {
       @for (ex of program()[day]; track ex.exerciseKey) {
         <div class="exercise-block">
-          <h3>{{ ex.name }}</h3>
+          <div class="exercise-head">
+            <h3>{{ ex.name }}</h3>
+            @if (ex.notes?.trim()) {
+              <p class="ex-notes">{{ ex.notes }}</p>
+            }
+          </div>
           <div class="sets-grid">
             <div class="set-col">
               <span class="set-label">Set 1</span>

@@ -105,21 +105,73 @@ ul {
   gap: 0.55rem;
 }
 
-li {
+li.ex-card {
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
 }
 
-li input {
+.ex-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
   flex: 1;
   min-width: 0;
+}
+
+.field-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.field input {
+  width: 100%;
   padding: 0.55rem 0.75rem;
   font-size: 0.9375rem;
 }
 
+.notes-field textarea {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  resize: vertical;
+  min-height: 3.25rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.notes-field textarea:focus {
+  outline: none;
+  border-color: rgba(45, 212, 191, 0.45);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.notes-field textarea::placeholder {
+  color: var(--text-muted);
+}
+
 .remove {
-  padding: 0.45rem 0.65rem;
+  flex-shrink: 0;
+  padding: 0.55rem 0.65rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--danger-bg);
   background: var(--danger-bg);
