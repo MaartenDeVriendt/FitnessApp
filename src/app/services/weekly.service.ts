@@ -13,8 +13,12 @@ import {
 import { Auth, onAuthStateChanged } from '@angular/fire/auth';
 import { Observable, of, switchMap } from 'rxjs';
 import { map } from 'rxjs/operators';
-import type { WeeklyProgram, WeekDayLogWithId, WeekLogExercise } from '../models/weekly.models';
-import { EMPTY_WEEKLY_PROGRAM } from '../models/weekly.models';
+import type { ExerciseKind, WeeklyProgram, WeekDayLogWithId, WeekLogExercise } from '../models/weekly.models';
+import {
+  EMPTY_WEEKLY_PROGRAM,
+  resolvedExerciseKind,
+  resolvedSetCount,
+} from '../models/weekly.models';
 import type { DayOfWeek } from '../weekly/weekly-utils';
 import { DAYS, addDays, formatLocalDate, weekLogDocId } from '../weekly/weekly-utils';
 
@@ -32,7 +36,6 @@ export class WeeklyService {
     return () => unsub();
   });
 
-  /** Repeating Mon–Sun exercise list (empty days allowed). */
   program$(): Observable<WeeklyProgram> {
     return this.userId$.pipe(
       switchMap((uid) => {
@@ -45,7 +48,6 @@ export class WeeklyService {
     );
   }
 
-  /** All week/day logs (for PRs and analytics). */
   allWeekLogs$(): Observable<WeekDayLogWithId[]> {
     return this.userId$.pipe(
       switchMap((uid) => {
@@ -53,11 +55,10 @@ export class WeeklyService {
         const ref = collection(this.firestore, 'users', uid, WEEK_LOGS_COLLECTION);
         return collectionData(ref, { idField: 'id' }) as Observable<WeekDayLogWithId[]>;
       }),
-      map((list) => list.map((w) => this.mapWeekLogFromFirestore(w))),
+      map((list) => list.map((w: WeekDayLogWithId) => this.mapWeekLogFromFirestore(w))),
     );
   }
 
-  /** Logs for each weekday for the week starting `weekMonday`. */
   weekLogsForMonday$(weekMonday: Date): Observable<Record<DayOfWeek, WeekDayLogWithId | null>> {
     const key = formatLocalDate(weekMonday);
     return this.userId$.pipe(
@@ -110,71 +111,138 @@ export class WeeklyService {
     const uid = this.requireUid();
     const id = weekLogDocId(weekMonday, day);
     const d = doc(this.firestore, 'users', uid, WEEK_LOGS_COLLECTION, id);
+    const payload = exercises.map((e) => {
+      if (e.kind === 'cardio') {
+        const dm = e.durationMinutes;
+        return {
+          exerciseKey: e.exerciseKey,
+          name: e.name.trim(),
+          kind: 'cardio' as const,
+          durationMinutes:
+            dm == null || !Number.isFinite(Number(dm)) ? null : Number(dm),
+        };
+      }
+      return {
+        exerciseKey: e.exerciseKey,
+        name: e.name.trim(),
+        kind: 'strength' as const,
+        sets: (e.sets ?? []).map((x) => Number(x)),
+      };
+    });
     await setDoc(
       d,
       {
         weekMondayKey: formatLocalDate(weekMonday),
         dayOfWeek: day,
-        exercises: exercises.map((e) => ({
-          exerciseKey: e.exerciseKey,
-          name: e.name.trim(),
-          sets: [Number(e.sets[0]), Number(e.sets[1]), Number(e.sets[2])],
-        })),
+        exercises: payload,
         updatedAt: serverTimestamp(),
       },
       { merge: true },
     );
   }
 
-  /**
-   * For each exerciseKey, best weight logged on set 1, set 2, and set 3 (indices 0–2) across all week logs.
-   */
-  computeBestPerExerciseSet(logs: WeekDayLogWithId[]): Map<string, readonly [number, number, number]> {
-    const m = new Map<string, [number, number, number]>();
+  /** Strength only: per-set best kg; array length grows with max sets seen. */
+  computeBestPerExerciseSet(logs: WeekDayLogWithId[]): Map<string, number[]> {
+    const m = new Map<string, number[]>();
     for (const log of logs) {
       for (const ex of log.exercises) {
-        const s = ex.sets;
-        const cur = m.get(ex.exerciseKey) ?? [0, 0, 0];
-        m.set(ex.exerciseKey, [
-          Math.max(cur[0], s[0]),
-          Math.max(cur[1], s[1]),
-          Math.max(cur[2], s[2]),
-        ]);
+        if (ex.kind === 'cardio' || !ex.sets?.length) continue;
+        const cur = m.get(ex.exerciseKey) ?? [];
+        const next = [...cur];
+        for (let i = 0; i < ex.sets.length; i++) {
+          const v = ex.sets[i];
+          next[i] = Math.max(next[i] ?? 0, v);
+        }
+        m.set(ex.exerciseKey, next);
       }
     }
     return m;
   }
 
-  listSetPersonalRecords(logs: WeekDayLogWithId[]): { exerciseKey: string; exerciseName: string; setIndex: 1 | 2 | 3; bestKg: number; whenLabel: string }[] {
-    const m = new Map<string, { name: string; bests: [number, number, number] }>();
+  /** Cardio: longest session in minutes per exercise key. */
+  computeBestCardioMinutes(logs: WeekDayLogWithId[]): Map<string, number> {
+    const m = new Map<string, number>();
     for (const log of logs) {
       for (const ex of log.exercises) {
+        if (ex.kind !== 'cardio' || ex.durationMinutes == null || !Number.isFinite(ex.durationMinutes)) {
+          continue;
+        }
+        const prev = m.get(ex.exerciseKey) ?? 0;
+        if (ex.durationMinutes > prev) m.set(ex.exerciseKey, ex.durationMinutes);
+      }
+    }
+    return m;
+  }
+
+  listSetPersonalRecords(logs: WeekDayLogWithId[]): {
+    exerciseKey: string;
+    exerciseName: string;
+    setIndex: number;
+    bestKg: number;
+    whenLabel: string;
+  }[] {
+    const m = new Map<string, { name: string; bests: number[] }>();
+    for (const log of logs) {
+      for (const ex of log.exercises) {
+        if (ex.kind === 'cardio' || !ex.sets?.length) continue;
         const prev = m.get(ex.exerciseKey);
-        const s = ex.sets;
         if (!prev) {
-          m.set(ex.exerciseKey, { name: ex.name, bests: [s[0], s[1], s[2]] });
+          m.set(ex.exerciseKey, { name: ex.name, bests: [...ex.sets] });
         } else {
-          prev.bests = [
-            Math.max(prev.bests[0], s[0]),
-            Math.max(prev.bests[1], s[1]),
-            Math.max(prev.bests[2], s[2]),
-          ];
+          const maxLen = Math.max(prev.bests.length, ex.sets.length);
+          const merged: number[] = [];
+          for (let i = 0; i < maxLen; i++) {
+            merged[i] = Math.max(prev.bests[i] ?? 0, ex.sets[i] ?? 0);
+          }
+          prev.bests = merged;
         }
       }
     }
-    const rows: { exerciseKey: string; exerciseName: string; setIndex: 1 | 2 | 3; bestKg: number; whenLabel: string }[] = [];
+    const rows: {
+      exerciseKey: string;
+      exerciseName: string;
+      setIndex: number;
+      bestKg: number;
+      whenLabel: string;
+    }[] = [];
     for (const [exerciseKey, { name, bests }] of m) {
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < bests.length; i++) {
         rows.push({
           exerciseKey,
           exerciseName: name,
-          setIndex: (i + 1) as 1 | 2 | 3,
+          setIndex: i + 1,
           bestKg: bests[i],
           whenLabel: 'all weeks',
         });
       }
     }
     return rows.sort((a, b) => a.exerciseName.localeCompare(b.exerciseName) || a.setIndex - b.setIndex);
+  }
+
+  listCardioPersonalRecords(logs: WeekDayLogWithId[]): {
+    exerciseKey: string;
+    exerciseName: string;
+    bestMinutes: number;
+  }[] {
+    const m = new Map<string, { name: string; best: number }>();
+    for (const log of logs) {
+      for (const ex of log.exercises) {
+        if (ex.kind !== 'cardio' || ex.durationMinutes == null || !Number.isFinite(ex.durationMinutes)) {
+          continue;
+        }
+        const prev = m.get(ex.exerciseKey);
+        if (!prev || ex.durationMinutes > prev.best) {
+          m.set(ex.exerciseKey, { name: ex.name, best: ex.durationMinutes });
+        }
+      }
+    }
+    return [...m.entries()]
+      .map(([exerciseKey, { name, best }]) => ({
+        exerciseKey,
+        exerciseName: name,
+        bestMinutes: best,
+      }))
+      .sort((a, b) => a.exerciseName.localeCompare(b.exerciseName));
   }
 
   previousWeekMonday(weekMonday: Date): Date {
@@ -194,9 +262,18 @@ export class WeeklyService {
             const notesRaw = o.notes ?? o.description;
             const notesTrimmed =
               typeof notesRaw === 'string' && notesRaw.trim() ? notesRaw.trim() : undefined;
+            const kind: ExerciseKind = o.kind === 'cardio' ? 'cardio' : 'strength';
+            const setCountRaw = o.setCount ?? o.setsCount;
+            let setCount: number | undefined;
+            if (kind === 'strength' && setCountRaw != null) {
+              const n = Math.round(Number(setCountRaw));
+              if (Number.isFinite(n)) setCount = Math.min(12, Math.max(1, n));
+            }
             return {
               exerciseKey: typeof o.exerciseKey === 'string' ? o.exerciseKey : crypto.randomUUID(),
               name: String(o.name).trim(),
+              kind,
+              ...(kind === 'strength' && setCount != null ? { setCount } : {}),
               ...(notesTrimmed ? { notes: notesTrimmed } : {}),
             };
           })
@@ -207,17 +284,36 @@ export class WeeklyService {
   }
 
   private mapWeekLogFromFirestore(w: WeekDayLogWithId): WeekDayLogWithId {
-    const exercises = (w.exercises ?? []).map((e) => ({
-      exerciseKey: e.exerciseKey,
-      name: e.name,
-      sets: [e.sets[0], e.sets[1], e.sets[2]] as WeekLogExercise['sets'],
-    }));
+    const exercises = (w.exercises ?? []).map((e) => this.mapWeekLogExercise(e as unknown as Record<string, unknown>));
     return {
       id: w.id,
       weekMondayKey: w.weekMondayKey,
       dayOfWeek: w.dayOfWeek as DayOfWeek,
       exercises,
     };
+  }
+
+  private mapWeekLogExercise(e: Record<string, unknown>): WeekLogExercise {
+    const kind: ExerciseKind = e['kind'] === 'cardio' ? 'cardio' : 'strength';
+    const name = String(e['name'] ?? '');
+    const exerciseKey = String(e['exerciseKey'] ?? '');
+    if (kind === 'cardio') {
+      const dm = e['durationMinutes'];
+      let durationMinutes: number | null = null;
+      if (typeof dm === 'number' && Number.isFinite(dm)) durationMinutes = dm;
+      else if (typeof dm === 'string' && dm.trim()) {
+        const p = parseFloat(dm);
+        if (Number.isFinite(p)) durationMinutes = p;
+      }
+      return { exerciseKey, name, kind: 'cardio', durationMinutes };
+    }
+    const setsRaw = e['sets'];
+    let sets: number[] = [0, 0, 0];
+    if (Array.isArray(setsRaw)) {
+      sets = setsRaw.map((x) => Number(x)).map((n) => (Number.isFinite(n) ? n : 0));
+      if (sets.length === 0) sets = [0, 0, 0];
+    }
+    return { exerciseKey, name, kind: 'strength', sets };
   }
 
   private sanitizeProgram(program: WeeklyProgram): WeeklyProgram {
@@ -227,11 +323,17 @@ export class WeeklyService {
         .map((e) => {
           const name = e.name.trim();
           const notes = e.notes?.trim();
-          return {
+          const kind = resolvedExerciseKind(e);
+          const base: (typeof program)[typeof day][0] = {
             exerciseKey: e.exerciseKey,
             name,
+            kind,
             ...(notes ? { notes } : {}),
           };
+          if (kind === 'strength') {
+            return { ...base, setCount: resolvedSetCount(e) };
+          }
+          return base;
         })
         .filter((e) => e.name.length > 0);
     }
@@ -249,6 +351,8 @@ interface ProgramExerciseRaw {
   exerciseKey?: string;
   name?: string;
   notes?: string;
-  /** Legacy / alias if you ever stored this key */
   description?: string;
+  kind?: string;
+  setCount?: number;
+  setsCount?: number;
 }

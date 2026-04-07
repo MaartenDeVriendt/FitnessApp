@@ -5,6 +5,18 @@ h1 {
   margin: 0 0 0.35rem;
 }
 
+.section-title {
+  font-size: 1.05rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 2rem 0 0.25rem;
+  letter-spacing: -0.02em;
+}
+
+.section-title:first-of-type {
+  margin-top: 1.25rem;
+}
+
 .hint {
   color: var(--text-muted);
   font-size: 0.875rem;

@@ -1,23 +1,46 @@
-import { Component, effect, inject, signal } from '@angular/core';
+import {
+  afterNextRender,
+  Component,
+  effect,
+  ElementRef,
+  inject,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { combineLatest, switchMap } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { WeeklyService } from '../services/weekly.service';
-import { EMPTY_WEEKLY_PROGRAM, type WeeklyProgram } from '../models/weekly.models';
+import {
+  EMPTY_WEEKLY_PROGRAM,
+  type ProgramExercise,
+  type WeeklyProgram,
+  type WeekLogExercise,
+  resolvedExerciseKind,
+  resolvedSetCount,
+} from '../models/weekly.models';
 import type { DayOfWeek } from '../weekly/weekly-utils';
 import {
   DAYS,
   addDays,
+  dateForWeekday,
   dayLabel,
+  dayOfWeekFromDate,
   formatLocalDate,
   mondayOfWeekContaining,
+  shortDayLabel,
   sundayOfWeek,
 } from '../weekly/weekly-utils';
 import type { WeekDayLogWithId } from '../models/weekly.models';
 import { FormsModule } from '@angular/forms';
 
-type DraftMap = Record<string, [number, number, number]>;
+type DraftEntry =
+  | { kind: 'strength'; weights: number[] }
+  | { kind: 'cardio'; minutes: number };
+
+type DraftMap = Record<string, DraftEntry>;
 
 function emptyLogsRecord(): Record<DayOfWeek, WeekDayLogWithId | null> {
   return {
@@ -39,11 +62,11 @@ function emptyLogsRecord(): Record<DayOfWeek, WeekDayLogWithId | null> {
 })
 export class WeekViewComponent {
   private readonly weeklyService = inject(WeeklyService);
+  private readonly dayStripRef = viewChild<ElementRef<HTMLElement>>('dayStrip');
 
-  /** Monday 00:00 local for the week being edited. */
   readonly weekMonday = signal(mondayOfWeekContaining(new Date()));
+  readonly selectedDay = signal<DayOfWeek>(dayOfWeekFromDate(new Date()));
 
-  /** Program + this week’s logs + previous week’s logs for the selected Monday. */
   private readonly vm = toSignal(
     toObservable(this.weekMonday).pipe(
       switchMap((mon) =>
@@ -64,16 +87,24 @@ export class WeekViewComponent {
     },
   );
 
-  /** Best kg on set 1 / 2 / 3 per exerciseKey across all logged weeks. */
   readonly setBests = toSignal(
     this.weeklyService.allWeekLogs$().pipe(map((logs) => this.weeklyService.computeBestPerExerciseSet(logs))),
-    { initialValue: new Map<string, readonly [number, number, number]>() },
+    { initialValue: new Map<string, number[]>() },
   );
 
-  /** Local editable weights: key `${day}_${exerciseKey}` → [set1, set2, set3] kg. */
-  readonly draft = signal<DraftMap>({});
+  readonly cardioBests = toSignal(
+    this.weeklyService.allWeekLogs$().pipe(map((logs) => this.weeklyService.computeBestCardioMinutes(logs))),
+    { initialValue: new Map<string, number>() },
+  );
 
+  readonly draft = signal<DraftMap>({});
   readonly savingDay = signal<DayOfWeek | null>(null);
+
+  readonly days = DAYS;
+  dayLabel = dayLabel;
+  shortDayLabel = shortDayLabel;
+  resolvedExerciseKind = resolvedExerciseKind;
+  resolvedSetCount = resolvedSetCount;
 
   constructor() {
     effect(() => {
@@ -81,6 +112,34 @@ export class WeekViewComponent {
       if (!v) return;
       this.rebuildDraft(v.program, v.logs);
     });
+
+    effect(() => {
+      this.selectedDay();
+      this.weekMonday();
+      untracked(() => queueMicrotask(() => this.scrollActiveDayIntoView()));
+    });
+
+    afterNextRender(() => this.scrollActiveDayIntoView());
+  }
+
+  setIndexes(ex: ProgramExercise): number[] {
+    const n = resolvedSetCount(ex);
+    return Array.from({ length: n }, (_, i) => i);
+  }
+
+  selectDay(day: DayOfWeek): void {
+    this.selectedDay.set(day);
+  }
+
+  chipDateLabel(day: DayOfWeek): string {
+    return dateForWeekday(this.weekMonday(), day).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+
+  isChipToday(day: DayOfWeek): boolean {
+    return formatLocalDate(dateForWeekday(this.weekMonday(), day)) === formatLocalDate(new Date());
   }
 
   weekRangeLabel(): string {
@@ -97,8 +156,10 @@ export class WeekViewComponent {
     this.weekMonday.update((m) => addDays(m, 7));
   }
 
-  thisWeek(): void {
-    this.weekMonday.set(mondayOfWeekContaining(new Date()));
+  goToToday(): void {
+    const today = new Date();
+    this.weekMonday.set(mondayOfWeekContaining(today));
+    this.selectedDay.set(dayOfWeekFromDate(today));
   }
 
   program(): WeeklyProgram {
@@ -117,32 +178,66 @@ export class WeekViewComponent {
     return `${day}_${exerciseKey}`;
   }
 
-  getWeight(day: DayOfWeek, exerciseKey: string, setIdx: 0 | 1 | 2): number {
-    const key = this.draftKey(day, exerciseKey);
-    return this.draft()[key]?.[setIdx] ?? 0;
+  getStrengthWeight(day: DayOfWeek, ex: ProgramExercise, setIdx: number): number {
+    const e = this.draft()[this.draftKey(day, ex.exerciseKey)];
+    if (e?.kind !== 'strength') return 0;
+    return e.weights[setIdx] ?? 0;
   }
 
-  setWeight(day: DayOfWeek, exerciseKey: string, setIdx: 0 | 1 | 2, value: number | string): void {
-    const key = this.draftKey(day, exerciseKey);
-    const cur = this.draft()[key] ?? [0, 0, 0];
-    const next: [number, number, number] = [...cur] as [number, number, number];
-    const n = typeof value === 'string' ? parseFloat(value) : value;
-    next[setIdx] = Number.isFinite(n) ? n : 0;
-    this.draft.update((d) => ({ ...d, [key]: next }));
+  setStrengthWeight(day: DayOfWeek, ex: ProgramExercise, setIdx: number, value: number | string): void {
+    const key = this.draftKey(day, ex.exerciseKey);
+    const n = resolvedSetCount(ex);
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    const v = Number.isFinite(num) ? num : 0;
+    this.draft.update((m) => {
+      const cur = m[key];
+      let weights: number[] = cur?.kind === 'strength' ? [...cur.weights] : Array(n).fill(0);
+      while (weights.length < n) weights.push(0);
+      weights[setIdx] = v;
+      return { ...m, [key]: { kind: 'strength', weights } };
+    });
   }
 
-  lastWeekSetKg(day: DayOfWeek, exerciseKey: string, setIdx: 0 | 1 | 2): number | null {
+  getCardioMinutes(day: DayOfWeek, ex: ProgramExercise): number {
+    const e = this.draft()[this.draftKey(day, ex.exerciseKey)];
+    if (e?.kind !== 'cardio') return 0;
+    return e.minutes;
+  }
+
+  setCardioMinutes(day: DayOfWeek, ex: ProgramExercise, value: number | string): void {
+    const key = this.draftKey(day, ex.exerciseKey);
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    const minutes = Number.isFinite(num) ? num : 0;
+    this.draft.update((m) => ({ ...m, [key]: { kind: 'cardio', minutes } }));
+  }
+
+  lastWeekSetKg(day: DayOfWeek, exerciseKey: string, setIdx: number): number | null {
     const prev = this.prevLogsForDay(day);
     const ex = prev?.exercises.find((e) => e.exerciseKey === exerciseKey);
-    if (!ex) return null;
-    return ex.sets[setIdx];
+    if (!ex || ex.kind === 'cardio' || !ex.sets?.length) return null;
+    const v = ex.sets[setIdx];
+    return v != null ? v : null;
   }
 
-  bestEverSetKg(exerciseKey: string, setIdx: 0 | 1 | 2): number | null {
+  lastWeekCardioMinutes(day: DayOfWeek, exerciseKey: string): number | null {
+    const prev = this.prevLogsForDay(day);
+    const ex = prev?.exercises.find((e) => e.exerciseKey === exerciseKey);
+    if (!ex || ex.kind !== 'cardio' || ex.durationMinutes == null || !Number.isFinite(ex.durationMinutes)) {
+      return null;
+    }
+    return ex.durationMinutes;
+  }
+
+  bestEverSetKg(exerciseKey: string, setIdx: number): number | null {
     const row = this.setBests().get(exerciseKey);
     if (!row) return null;
     const v = row[setIdx];
-    return v > 0 ? v : null;
+    return v != null && v > 0 ? v : null;
+  }
+
+  bestCardioMinutes(exerciseKey: string): number | null {
+    const v = this.cardioBests().get(exerciseKey);
+    return v != null && v > 0 ? v : null;
   }
 
   async saveDay(day: DayOfWeek): Promise<void> {
@@ -150,42 +245,72 @@ export class WeekViewComponent {
     if (prog.length === 0) return;
     this.savingDay.set(day);
     try {
-      const exercises = prog.map((ex) => ({
-        exerciseKey: ex.exerciseKey,
-        name: ex.name,
-        sets: [
-          this.getWeight(day, ex.exerciseKey, 0),
-          this.getWeight(day, ex.exerciseKey, 1),
-          this.getWeight(day, ex.exerciseKey, 2),
-        ] as const,
-      }));
+      const exercises: WeekLogExercise[] = prog.map((ex) => {
+        const key = this.draftKey(day, ex.exerciseKey);
+        const d = this.draft()[key];
+        if (resolvedExerciseKind(ex) === 'cardio') {
+          const minutes = d?.kind === 'cardio' ? d.minutes : 0;
+          return {
+            exerciseKey: ex.exerciseKey,
+            name: ex.name,
+            kind: 'cardio' as const,
+            durationMinutes: Number.isFinite(minutes) ? minutes : 0,
+          };
+        }
+        const n = resolvedSetCount(ex);
+        const weights =
+          d?.kind === 'strength' ? [...d.weights] : Array(n).fill(0);
+        while (weights.length < n) weights.push(0);
+        return {
+          exerciseKey: ex.exerciseKey,
+          name: ex.name,
+          kind: 'strength' as const,
+          sets: weights.slice(0, n),
+        };
+      });
       await this.weeklyService.saveWeekDayLog(this.weekMonday(), day, exercises);
     } finally {
       this.savingDay.set(null);
     }
   }
 
-  readonly days = DAYS;
-
-  dayLabel = dayLabel;
+  private scrollActiveDayIntoView(): void {
+    const strip = this.dayStripRef()?.nativeElement;
+    if (!strip) return;
+    const d = this.selectedDay();
+    const chip = strip.querySelector<HTMLElement>(`[data-day="${d}"]`);
+    chip?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
 
   private rebuildDraft(program: WeeklyProgram, logs: Record<DayOfWeek, WeekDayLogWithId | null>): void {
     const next: DraftMap = {};
-    for (const day of DAYS) {
-      const log = logs[day];
-      for (const ex of program[day]) {
-        const key = this.draftKey(day, ex.exerciseKey);
+    for (const d of DAYS) {
+      const log = logs[d];
+      for (const ex of program[d]) {
+        const key = this.draftKey(d, ex.exerciseKey);
         const found = log?.exercises.find((e) => e.exerciseKey === ex.exerciseKey);
-        next[key] = found ? [found.sets[0], found.sets[1], found.sets[2]] : [0, 0, 0];
+        if (resolvedExerciseKind(ex) === 'cardio') {
+          let minutes = 0;
+          if (
+            found?.kind === 'cardio' &&
+            found.durationMinutes != null &&
+            Number.isFinite(found.durationMinutes)
+          ) {
+            minutes = found.durationMinutes;
+          }
+          next[key] = { kind: 'cardio', minutes };
+        } else {
+          const n = resolvedSetCount(ex);
+          const weights = Array(n).fill(0);
+          if (found?.kind === 'strength' && found.sets?.length) {
+            for (let i = 0; i < n; i++) {
+              weights[i] = found.sets[i] ?? 0;
+            }
+          }
+          next[key] = { kind: 'strength', weights };
+        }
       }
     }
     this.draft.set(next);
   }
-}
-
-interface Vm {
-  mon: Date;
-  program: WeeklyProgram;
-  logs: Record<DayOfWeek, WeekDayLogWithId | null>;
-  prevLogs: Record<DayOfWeek, WeekDayLogWithId | null>;
 }

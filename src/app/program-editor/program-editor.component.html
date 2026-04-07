@@ -1,12 +1,11 @@
 <div class="head">
   <h1>Edit week template</h1>
-  <a routerLink="/week" class="back">← Back to this week</a>
+  <a routerLink="/week" class="back">← Back</a>
 </div>
 
 <p class="hint">
-  Set which exercises you do on each weekday. This <strong>repeats every week</strong>. Add a <strong>name</strong> and optional
-  <strong>notes</strong> (form cues, reps scheme, equipment). Logging happens on the
-  <a routerLink="/week">week view</a>.
+  Add <strong>strength</strong> lifts with a chosen number of sets, or <strong>cardio</strong> where you log duration (minutes) on the day view.
+  <a routerLink="/week">Today</a> tab.
 </p>
 
 @if (message()) {
@@ -26,16 +25,42 @@
         @for (ex of draft()[day]; track ex.exerciseKey) {
           <li class="ex-card">
             <div class="ex-row">
-              <label class="field">
+              <label class="field grow">
                 <span class="field-label">Name</span>
                 <input
                   type="text"
                   [ngModel]="ex.name"
                   (ngModelChange)="updateName(day, ex.exerciseKey, $event)"
-                  placeholder="e.g. Back squat"
+                  placeholder="e.g. Back squat or Treadmill"
                 />
               </label>
               <button type="button" class="remove" (click)="removeExercise(day, ex.exerciseKey)">Remove</button>
+            </div>
+            <div class="opts-row">
+              <label class="field compact">
+                <span class="field-label">Type</span>
+                <select
+                  [ngModel]="ex.kind === 'cardio' ? 'cardio' : 'strength'"
+                  (ngModelChange)="updateKind(day, ex.exerciseKey, $event)"
+                >
+                  @for (k of kinds; track k.id) {
+                    <option [ngValue]="k.id">{{ k.label }}</option>
+                  }
+                </select>
+              </label>
+              @if (ex.kind !== 'cardio') {
+                <label class="field compact">
+                  <span class="field-label">Sets</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    step="1"
+                    [ngModel]="ex.setCount ?? 3"
+                    (ngModelChange)="updateSetCount(day, ex.exerciseKey, $event)"
+                  />
+                </label>
+              }
             </div>
             <label class="field notes-field">
               <span class="field-label">Notes</span>
@@ -43,7 +68,7 @@
                 rows="2"
                 [ngModel]="ex.notes ?? ''"
                 (ngModelChange)="updateNotes(day, ex.exerciseKey, $event)"
-                placeholder="Optional: tempo, stance, target RPE, injuries to watch…"
+                placeholder="Optional: tempo, pace, heart rate…"
               ></textarea>
             </label>
           </li>

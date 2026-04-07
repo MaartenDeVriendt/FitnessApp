@@ -3,7 +3,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { WeeklyService } from '../services/weekly.service';
-import { EMPTY_WEEKLY_PROGRAM, type ProgramExercise, type WeeklyProgram } from '../models/weekly.models';
+import {
+  EMPTY_WEEKLY_PROGRAM,
+  type ExerciseKind,
+  type ProgramExercise,
+  type WeeklyProgram,
+} from '../models/weekly.models';
 import { DAYS, dayLabel, type DayOfWeek } from '../weekly/weekly-utils';
 
 @Component({
@@ -23,6 +28,11 @@ export class ProgramEditorComponent implements OnInit {
   readonly days = DAYS;
   dayLabel = dayLabel;
 
+  readonly kinds: { id: ExerciseKind; label: string }[] = [
+    { id: 'strength', label: 'Strength (weights)' },
+    { id: 'cardio', label: 'Cardio (duration)' },
+  ];
+
   ngOnInit(): void {
     this.weeklyService
       .program$()
@@ -31,7 +41,13 @@ export class ProgramEditorComponent implements OnInit {
   }
 
   addExercise(day: DayOfWeek): void {
-    const row: ProgramExercise = { exerciseKey: crypto.randomUUID(), name: '', notes: '' };
+    const row: ProgramExercise = {
+      exerciseKey: crypto.randomUUID(),
+      name: '',
+      notes: '',
+      kind: 'strength',
+      setCount: 3,
+    };
     this.draft.update((d) => ({
       ...d,
       [day]: [...d[day], row],
@@ -56,6 +72,28 @@ export class ProgramEditorComponent implements OnInit {
     this.draft.update((d) => ({
       ...d,
       [day]: d[day].map((e) => (e.exerciseKey === exerciseKey ? { ...e, notes } : e)),
+    }));
+  }
+
+  updateKind(day: DayOfWeek, exerciseKey: string, kind: ExerciseKind): void {
+    this.draft.update((d) => ({
+      ...d,
+      [day]: d[day].map((e) => {
+        if (e.exerciseKey !== exerciseKey) return e;
+        if (kind === 'cardio') {
+          const { setCount: _, ...rest } = e;
+          return { ...rest, kind: 'cardio' };
+        }
+        return { ...e, kind: 'strength', setCount: e.setCount ?? 3 };
+      }),
+    }));
+  }
+
+  updateSetCount(day: DayOfWeek, exerciseKey: string, count: number): void {
+    const n = Math.min(12, Math.max(1, Math.round(Number(count)) || 3));
+    this.draft.update((d) => ({
+      ...d,
+      [day]: d[day].map((e) => (e.exerciseKey === exerciseKey ? { ...e, setCount: n } : e)),
     }));
   }
 

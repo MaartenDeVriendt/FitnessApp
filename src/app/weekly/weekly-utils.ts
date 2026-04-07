@@ -43,6 +43,22 @@ export function dayLabel(day: DayOfWeek): string {
   return day.charAt(0).toUpperCase() + day.slice(1);
 }
 
+/** Short label for sliders (e.g. Mon). */
+export function shortDayLabel(day: DayOfWeek): string {
+  return dayLabel(day).slice(0, 3);
+}
+
+/** Local calendar weekday for `date` (Mon–Sun model). */
+export function dayOfWeekFromDate(date: Date): DayOfWeek {
+  const map: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  return map[date.getDay()];
+}
+
+/** Calendar date for that weekday in the week that starts on `weekMonday`. */
+export function dateForWeekday(weekMonday: Date, day: DayOfWeek): Date {
+  return addDays(weekMonday, DAYS.indexOf(day));
+}
+
 /** Sunday end date for header range (Mon–Sun). */
 export function sundayOfWeek(monday: Date): Date {
   return addDays(monday, 6);

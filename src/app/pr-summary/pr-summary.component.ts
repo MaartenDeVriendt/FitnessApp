@@ -19,4 +19,9 @@ export class PrSummaryComponent {
     this.weeklyService.allWeekLogs$().pipe(map((logs) => this.weeklyService.listSetPersonalRecords(logs))),
     { initialValue: [] },
   );
+
+  readonly cardioRecords = toSignal(
+    this.weeklyService.allWeekLogs$().pipe(map((logs) => this.weeklyService.listCardioPersonalRecords(logs))),
+    { initialValue: [] },
+  );
 }

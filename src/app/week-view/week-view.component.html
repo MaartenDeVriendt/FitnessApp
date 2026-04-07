@@ -1,13 +1,4 @@
 <div class="week-head">
-  <div class="nav-week">
-    <button type="button" (click)="prevWeek()" aria-label="Previous week">←</button>
-    <div class="range">
-      <span class="label">Week</span>
-      <strong>{{ weekRangeLabel() }}</strong>
-      <button type="button" class="link" (click)="thisWeek()">Jump to this week</button>
-    </div>
-    <button type="button" (click)="nextWeek()" aria-label="Next week">→</button>
-  </div>
   <div class="links">
     <a routerLink="/program" class="btn secondary">Edit week template</a>
     <a routerLink="/prs" class="btn secondary">PRs</a>
@@ -15,111 +6,131 @@
 </div>
 
 <p class="intro">
-  Your <strong>template</strong> repeats every Monday–Sunday. Log weights for each day; we show <strong>last week (same day)</strong> and
-  <strong>your best ever</strong> for each set.
+  Swipe the <strong>day strip</strong> to pick a weekday (defaults to <strong>today</strong>). Use ← → to change the calendar week. For strength we show
+  <strong>last week</strong> and <strong>best ever</strong> per set; for cardio, duration (minutes) with last week and longest logged.
 </p>
 
-@for (day of days; track day) {
-  <section class="day-card">
-    <header>
-      <h2>{{ dayLabel(day) }}</h2>
-      @if (program()[day].length > 0) {
-        <button type="button" class="primary" [disabled]="savingDay() === day" (click)="saveDay(day)">
-          {{ savingDay() === day ? 'Saving…' : 'Save ' + dayLabel(day) }}
-        </button>
-      }
-    </header>
+<div class="day-slider-wrap">
+  <button type="button" class="week-arrow" (click)="prevWeek()" aria-label="Previous week">←</button>
+  <div class="day-strip" #dayStrip role="tablist" aria-label="Choose day of week">
+    @for (d of days; track d) {
+      <button
+        type="button"
+        class="day-chip"
+        role="tab"
+        [attr.aria-selected]="selectedDay() === d"
+        [class.active]="selectedDay() === d"
+        [class.today]="isChipToday(d)"
+        [attr.data-day]="d"
+        (click)="selectDay(d)"
+      >
+        <span class="dow">{{ shortDayLabel(d) }}</span>
+        <span class="dom">{{ chipDateLabel(d) }}</span>
+      </button>
+    }
+  </div>
+  <button type="button" class="week-arrow" (click)="nextWeek()" aria-label="Next week">→</button>
+</div>
 
-    @if (program()[day].length === 0) {
-      <p class="empty-day">No exercises for {{ dayLabel(day) }}. Add them in <a routerLink="/program">Edit week template</a>.</p>
-    } @else {
-      @for (ex of program()[day]; track ex.exerciseKey) {
-        <div class="exercise-block">
-          <div class="exercise-head">
-            <h3>{{ ex.name }}</h3>
-            @if (ex.notes?.trim()) {
-              <p class="ex-notes">{{ ex.notes }}</p>
+<p class="week-caption">
+  <span class="cap-label">Week</span>
+  <span class="cap-range">{{ weekRangeLabel() }}</span>
+  <button type="button" class="link" (click)="goToToday()">Today</button>
+</p>
+
+@let day = selectedDay();
+
+<section class="day-card">
+  <header>
+    <div class="day-title">
+      <h2>{{ dayLabel(day) }}</h2>
+      <span class="subdate">{{ chipDateLabel(day) }}</span>
+    </div>
+    @if (program()[day].length > 0) {
+      <button type="button" class="primary" [disabled]="savingDay() === day" (click)="saveDay(day)">
+        {{ savingDay() === day ? 'Saving…' : 'Save day' }}
+      </button>
+    }
+  </header>
+
+  @if (program()[day].length === 0) {
+    <p class="empty-day">No exercises for {{ dayLabel(day) }}. Add them in <a routerLink="/program">Edit week template</a>.</p>
+  } @else {
+    @for (ex of program()[day]; track ex.exerciseKey) {
+      <div class="exercise-block">
+        <div class="exercise-head">
+          <h3>{{ ex.name }}</h3>
+          @if (resolvedExerciseKind(ex) === 'cardio') {
+            <span class="kind-pill cardio">Cardio</span>
+          }
+          @if (ex.notes?.trim()) {
+            <p class="ex-notes">{{ ex.notes }}</p>
+          }
+        </div>
+        @if (resolvedExerciseKind(ex) === 'cardio') {
+          <div class="cardio-block">
+            <div class="set-col cardio-col">
+              <span class="set-label">Duration</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                [ngModel]="getCardioMinutes(day, ex)"
+                (ngModelChange)="setCardioMinutes(day, ex, $event)"
+              />
+              <span class="unit">min</span>
+              <div class="hints">
+                @if (lastWeekCardioMinutes(day, ex.exerciseKey) != null) {
+                  <span class="hint last"
+                    >Last week: <strong>{{ lastWeekCardioMinutes(day, ex.exerciseKey) }}</strong> min</span
+                  >
+                } @else {
+                  <span class="hint muted">No log last week</span>
+                }
+                @if (bestCardioMinutes(ex.exerciseKey) != null) {
+                  <span class="hint pr"
+                    >Longest logged: <strong>{{ bestCardioMinutes(ex.exerciseKey) }}</strong> min</span
+                  >
+                } @else {
+                  <span class="hint muted">No history yet</span>
+                }
+              </div>
+            </div>
+          </div>
+        } @else {
+          <div class="sets-grid">
+            @for (si of setIndexes(ex); track si) {
+              <div class="set-col">
+                <span class="set-label">Set {{ si + 1 }}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  [ngModel]="getStrengthWeight(day, ex, si)"
+                  (ngModelChange)="setStrengthWeight(day, ex, si, $event)"
+                />
+                <span class="unit">kg</span>
+                <div class="hints">
+                  @if (lastWeekSetKg(day, ex.exerciseKey, si) != null) {
+                    <span class="hint last"
+                      >Last week: <strong>{{ lastWeekSetKg(day, ex.exerciseKey, si) }}</strong> kg</span
+                    >
+                  } @else {
+                    <span class="hint muted">No log last week</span>
+                  }
+                  @if (bestEverSetKg(ex.exerciseKey, si) != null) {
+                    <span class="hint pr"
+                      >Best ever: <strong>{{ bestEverSetKg(ex.exerciseKey, si) }}</strong> kg</span
+                    >
+                  } @else {
+                    <span class="hint muted">No history yet</span>
+                  }
+                </div>
+              </div>
             }
           </div>
-          <div class="sets-grid">
-            <div class="set-col">
-              <span class="set-label">Set 1</span>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                [ngModel]="getWeight(day, ex.exerciseKey, 0)"
-                (ngModelChange)="setWeight(day, ex.exerciseKey, 0, $event)"
-              />
-              <span class="unit">kg</span>
-              <div class="hints">
-                @if (lastWeekSetKg(day, ex.exerciseKey, 0) != null) {
-                  <span class="hint last"
-                    >Last week: <strong>{{ lastWeekSetKg(day, ex.exerciseKey, 0) }}</strong> kg</span
-                  >
-                } @else {
-                  <span class="hint muted">No log last week</span>
-                }
-                @if (bestEverSetKg(ex.exerciseKey, 0) != null) {
-                  <span class="hint pr">Best ever: <strong>{{ bestEverSetKg(ex.exerciseKey, 0) }}</strong> kg</span>
-                } @else {
-                  <span class="hint muted">No history yet</span>
-                }
-              </div>
-            </div>
-            <div class="set-col">
-              <span class="set-label">Set 2</span>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                [ngModel]="getWeight(day, ex.exerciseKey, 1)"
-                (ngModelChange)="setWeight(day, ex.exerciseKey, 1, $event)"
-              />
-              <span class="unit">kg</span>
-              <div class="hints">
-                @if (lastWeekSetKg(day, ex.exerciseKey, 1) != null) {
-                  <span class="hint last"
-                    >Last week: <strong>{{ lastWeekSetKg(day, ex.exerciseKey, 1) }}</strong> kg</span
-                  >
-                } @else {
-                  <span class="hint muted">No log last week</span>
-                }
-                @if (bestEverSetKg(ex.exerciseKey, 1) != null) {
-                  <span class="hint pr">Best ever: <strong>{{ bestEverSetKg(ex.exerciseKey, 1) }}</strong> kg</span>
-                } @else {
-                  <span class="hint muted">No history yet</span>
-                }
-              </div>
-            </div>
-            <div class="set-col">
-              <span class="set-label">Set 3</span>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                [ngModel]="getWeight(day, ex.exerciseKey, 2)"
-                (ngModelChange)="setWeight(day, ex.exerciseKey, 2, $event)"
-              />
-              <span class="unit">kg</span>
-              <div class="hints">
-                @if (lastWeekSetKg(day, ex.exerciseKey, 2) != null) {
-                  <span class="hint last"
-                    >Last week: <strong>{{ lastWeekSetKg(day, ex.exerciseKey, 2) }}</strong> kg</span
-                  >
-                } @else {
-                  <span class="hint muted">No log last week</span>
-                }
-                @if (bestEverSetKg(ex.exerciseKey, 2) != null) {
-                  <span class="hint pr">Best ever: <strong>{{ bestEverSetKg(ex.exerciseKey, 2) }}</strong> kg</span>
-                } @else {
-                  <span class="hint muted">No history yet</span>
-                }
-              </div>
-            </div>
-          </div>
-        </div>
-      }
+        }
+      </div>
     }
-  </section>
-}
+  }
+</section>

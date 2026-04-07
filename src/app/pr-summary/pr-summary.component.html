@@ -1,9 +1,11 @@
 <h1>Personal records</h1>
-<p class="hint">Highest weight (kg) you logged on <strong>set 1, 2, and 3</strong> for each exercise, across all weeks.</p>
 
-@let rows = records().filter((r) => r.bestKg > 0);
-@if (rows.length === 0) {
-  <p class="empty">Log weights on the week view to build history.</p>
+<h2 class="section-title">Strength</h2>
+<p class="hint">Highest weight (kg) you logged on each set for each exercise, across all weeks.</p>
+
+@let strengthRows = records().filter((r) => r.bestKg > 0);
+@if (strengthRows.length === 0) {
+  <p class="empty">No strength PRs yet. Log weights on Today to build history.</p>
 } @else {
   <table>
     <thead>
@@ -14,11 +16,36 @@
       </tr>
     </thead>
     <tbody>
-      @for (r of rows; track r.exerciseKey + '-' + r.setIndex) {
+      @for (r of strengthRows; track r.exerciseKey + '-' + r.setIndex) {
         <tr>
           <td>{{ r.exerciseName }}</td>
           <td>{{ r.setIndex }}</td>
           <td>{{ r.bestKg }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}
+
+<h2 class="section-title">Cardio</h2>
+<p class="hint">Longest duration (minutes) you logged for each cardio exercise, across all weeks.</p>
+
+@let cardioRows = cardioRecords().filter((r) => r.bestMinutes > 0);
+@if (cardioRows.length === 0) {
+  <p class="empty">No cardio PRs yet. Log duration on Today for cardio exercises.</p>
+} @else {
+  <table>
+    <thead>
+      <tr>
+        <th>Exercise</th>
+        <th>Longest (min)</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (r of cardioRows; track r.exerciseKey) {
+        <tr>
+          <td>{{ r.exerciseName }}</td>
+          <td>{{ r.bestMinutes }}</td>
         </tr>
       }
     </tbody>
