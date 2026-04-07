@@ -55,6 +55,86 @@
   font-weight: 600;
 }
 
+.intro-gate {
+  border-color: rgba(45, 212, 191, 0.22);
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.08), var(--accent-subtle));
+}
+
+.workout-gate {
+  margin-top: 0.25rem;
+  padding: 1.35rem 1.25rem 1.5rem;
+  padding-left: calc(0.35rem + 1.25rem);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, rgba(45, 212, 191, 0.12), var(--bg-elevated));
+  border: 1px solid rgba(45, 212, 191, 0.25);
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+
+.gate-eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.gate-title {
+  margin: 0 0 0.65rem;
+  font-size: 1.35rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.gate-lead {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 22rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.gate-count {
+  margin: 0 0 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.gate-start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.75rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), #0d9488);
+  color: #042f2e;
+  font-weight: 800;
+  font-size: 0.9375rem;
+  font-family: var(--font-display);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition:
+    filter var(--transition),
+    transform 0.12s ease;
+  box-shadow: 0 4px 20px rgba(45, 212, 191, 0.25);
+}
+
+.gate-start:hover {
+  filter: brightness(1.08);
+}
+
+.gate-start:active {
+  transform: scale(0.98);
+}
+
 /* Week arrows + horizontal day strip (scroll / swipe) */
 .day-slider-wrap {
   display: flex;

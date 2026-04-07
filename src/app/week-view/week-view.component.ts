@@ -14,6 +14,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { combineLatest, switchMap } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { WeeklyService } from '../services/weekly.service';
+import { AuthService } from '../services/auth.service';
 import {
   EMPTY_WEEKLY_PROGRAM,
   type ProgramExercise,
@@ -55,6 +56,8 @@ function emptyLogsRecord(): Record<DayOfWeek, WeekDayLogWithId | null> {
   };
 }
 
+const WORKOUT_GATE_STORAGE_PREFIX = 'fitness_workout_gate_v1';
+
 @Component({
   selector: 'app-week-view',
   imports: [RouterLink, FormsModule],
@@ -63,8 +66,12 @@ function emptyLogsRecord(): Record<DayOfWeek, WeekDayLogWithId | null> {
 })
 export class WeekViewComponent {
   private readonly weeklyService = inject(WeeklyService);
+  private readonly authService = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly dayStripRef = viewChild<ElementRef<HTMLElement>>('dayStrip');
+
+  /** Bumps when the user taps “Start workout” so the view opens without a full reload. */
+  private readonly workoutGateEpoch = signal(0);
 
   /** Debounced writes after editing weights or cardio (ms). */
   private readonly autosaveDelayMs = 800;
@@ -176,6 +183,43 @@ export class WeekViewComponent {
 
   selectDay(day: DayOfWeek): void {
     this.selectedDay.set(day);
+  }
+
+  private workoutGateStorageKey(day: DayOfWeek): string | null {
+    const uid = this.authService.user()?.uid;
+    if (!uid) return null;
+    return `${WORKOUT_GATE_STORAGE_PREFIX}:${uid}:${formatLocalDate(this.weekMonday())}:${day}`;
+  }
+
+  /**
+   * Whether this calendar week + weekday session is “unlocked” (user tapped Start).
+   * Stored locally per user/week/day — new week = gate again.
+   */
+  hasStartedWorkout(day: DayOfWeek): boolean {
+    this.workoutGateEpoch();
+    this.weekMonday();
+    this.authService.user();
+    const key = this.workoutGateStorageKey(day);
+    if (!key) return true;
+    if (typeof localStorage === 'undefined') return true;
+    return localStorage.getItem(key) === '1';
+  }
+
+  startWorkout(day: DayOfWeek): void {
+    const key = this.workoutGateStorageKey(day);
+    if (key && typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, '1');
+    }
+    this.workoutGateEpoch.update((n) => n + 1);
+  }
+
+  plannedExerciseCount(day: DayOfWeek): number {
+    return this.program()[day].length;
+  }
+
+  plannedExerciseLabel(day: DayOfWeek): string {
+    const n = this.plannedExerciseCount(day);
+    return n === 1 ? '1 exercise lined up' : `${n} exercises lined up`;
   }
 
   chipDateLabel(day: DayOfWeek): string {

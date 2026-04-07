@@ -5,11 +5,6 @@
   </div>
 </div>
 
-<p class="intro">
-  Swipe the <strong>day strip</strong> to pick a weekday (defaults to <strong>today</strong>). Use ← → to change the calendar week. <strong>Weights and cardio</strong> save automatically shortly after you stop typing; tap <strong>Save now</strong> to write to the cloud immediately. Tap <strong>Complete</strong> when you finish an exercise — it moves to the bottom and the next one stays on top with a <strong>Next</strong> label. For strength we show
-  <strong>last week</strong> and <strong>best ever</strong> per set; for cardio, duration (minutes) with last week and longest logged.
-</p>
-
 <div class="day-slider-wrap">
   <button type="button" class="week-arrow" (click)="prevWeek()" aria-label="Previous week">←</button>
   <div class="day-strip" #dayStrip role="tablist" aria-label="Choose day of week">
@@ -40,13 +35,24 @@
 
 @let day = selectedDay();
 
+@if (hasStartedWorkout(day)) {
+  <p class="intro">
+    Swipe the <strong>day strip</strong> to pick a weekday (defaults to <strong>today</strong>). Use ← → to change the calendar week. <strong>Weights and cardio</strong> save automatically shortly after you stop typing; tap <strong>Save now</strong> to write to the cloud immediately. Tap <strong>Complete</strong> when you finish an exercise — it moves to the bottom and the next one stays on top with a <strong>Next</strong> label. For strength we show
+    <strong>last week</strong> and <strong>best ever</strong> per set; for cardio, duration (minutes) with last week and longest logged.
+  </p>
+} @else {
+  <p class="intro intro-gate">
+    Pick the day you’re training above, then tap <strong>Start workout</strong> when you’re ready. Your plan stays hidden until then — a small ritual to get in the zone.
+  </p>
+}
+
 <section class="day-card">
   <header>
     <div class="day-title">
       <h2>{{ dayLabel(day) }}</h2>
       <span class="subdate">{{ chipDateLabel(day) }}</span>
     </div>
-    @if (program()[day].length > 0) {
+    @if (program()[day].length > 0 && hasStartedWorkout(day)) {
       <button type="button" class="primary" [disabled]="savingDay() === day" (click)="saveDay(day)">
         {{ savingDay() === day ? 'Saving…' : 'Save now' }}
       </button>
@@ -55,6 +61,16 @@
 
   @if (program()[day].length === 0) {
     <p class="empty-day">No exercises for {{ dayLabel(day) }}. Add them in <a routerLink="/program">Edit week template</a>.</p>
+  } @else if (!hasStartedWorkout(day)) {
+    <div class="workout-gate">
+      <p class="gate-eyebrow">You showed up</p>
+      <h3 class="gate-title">Ready to train {{ dayLabel(day) }}?</h3>
+      <p class="gate-lead">
+        Lock in for this session. Once you start, your full plan — names, sets, and logging — opens up.
+      </p>
+      <p class="gate-count">{{ plannedExerciseLabel(day) }} for this day.</p>
+      <button type="button" class="gate-start" (click)="startWorkout(day)">Start workout</button>
+    </div>
   } @else {
     @let sortedEx = exercisesSortedForDay(day);
     @let splitIdx = firstCompletedSortIndex(sortedEx, day);
