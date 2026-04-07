@@ -1,24 +1,24 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { Auth, authState } from '@angular/fire/auth';
-import { map, take } from 'rxjs/operators';
+import { Auth } from '@angular/fire/auth';
 
-/** Allow route only when signed in; otherwise navigate to `/login`. */
-export const authGuard: CanActivateFn = () => {
+/**
+ * Wait until Firebase has finished restoring the session from persistence, then allow the route
+ * only if signed in; otherwise send the user to `/login`.
+ */
+export const authGuard: CanActivateFn = async () => {
   const auth = inject(Auth);
   const router = inject(Router);
-  return authState(auth).pipe(
-    take(1),
-    map((u) => (u ? true : router.createUrlTree(['/login']))),
-  );
+  await auth.authStateReady();
+  return auth.currentUser ? true : router.createUrlTree(['/login']);
 };
 
-/** Allow `/login` only when signed out; signed-in users go to `/workouts`. */
-export const loginGuard: CanActivateFn = () => {
+/**
+ * Same readiness as above: `/login` is only for signed-out users; signed-in users go to `/week`.
+ */
+export const loginGuard: CanActivateFn = async () => {
   const auth = inject(Auth);
   const router = inject(Router);
-  return authState(auth).pipe(
-    take(1),
-    map((u) => (!u ? true : router.createUrlTree(['/week']))),
-  );
+  await auth.authStateReady();
+  return auth.currentUser ? router.createUrlTree(['/week']) : true;
 };

@@ -5,6 +5,12 @@
   color: var(--text);
 }
 
+.shell--guest {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
 .top {
   display: flex;
   align-items: center;
