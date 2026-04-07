@@ -1,11 +1,12 @@
 @if (user()) {
   <div class="shell">
     <header class="top">
-      <a routerLink="/week" class="brand">Train</a>
+      <a routerLink="/week" class="brand">{{ brandLabel() }}</a>
       <nav>
         <a routerLink="/week" routerLinkActive="active">This week</a>
         <a routerLink="/program" routerLinkActive="active">Week template</a>
         <a routerLink="/prs" routerLinkActive="active">PRs</a>
+        <a routerLink="/profile" routerLinkActive="active">Profile</a>
         <button type="button" class="ghost" (click)="logout()">Sign out</button>
       </nav>
     </header>

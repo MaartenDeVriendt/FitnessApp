@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { App } from './app';
 import { AuthService } from './services/auth.service';
+import { ProfileService } from './services/profile.service';
 
 describe('App', () => {
   beforeEach(async () => {
@@ -19,6 +20,13 @@ describe('App', () => {
             signUp: async () => undefined,
             login: async () => undefined,
             logout: async () => undefined,
+          },
+        },
+        {
+          provide: ProfileService,
+          useValue: {
+            profile$: of(null),
+            saveProfile: async () => undefined,
           },
         },
       ],

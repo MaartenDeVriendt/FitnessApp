@@ -37,6 +37,11 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  max-width: min(42vw, 11rem);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .brand::before {

@@ -43,13 +43,20 @@ export interface WorkoutWithId {
 }
 
 /**
- * Lightweight user profile at `users/{uid}` (Auth still owns identity; this doc is optional metadata).
+ * App profile at `users/{uid}` (Auth owns UID; Firestore holds editable fields).
  */
 export interface UserProfile {
   uid: string;
   email: string | null;
-  displayName?: string;
-  createdAt: Timestamp | Date;
+  /** From sign-up or profile page. */
+  displayName?: string | null;
+  /** Shown in the header; overrides display name when set. */
+  nickname?: string | null;
+  bio?: string | null;
+  heightCm?: number | null;
+  weightKg?: number | null;
+  createdAt?: Timestamp | Date;
+  updatedAt?: Timestamp | Date;
 }
 
 /**
