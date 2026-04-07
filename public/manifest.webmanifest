@@ -1,9 +1,11 @@
 {
-  "name": "fitness-pwa",
-  "short_name": "fitness-pwa",
+  "name": "Train — Fitness log",
+  "short_name": "Train",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",
+  "theme_color": "#0c0c0e",
+  "background_color": "#060607",
   "icons": [
     {
       "src": "icons/icon-72x72.png",
