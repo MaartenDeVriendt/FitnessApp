@@ -4,7 +4,7 @@
 </div>
 
 <p class="hint">
-  Add <strong>strength</strong> lifts with a chosen number of sets, or <strong>cardio</strong> where you log duration (minutes) on the day view.
+  Pick a <strong>day</strong> from the dropdown to edit that day’s plan. Add <strong>strength</strong> lifts with a chosen number of sets, or <strong>cardio</strong> for duration on the
   <a routerLink="/week">Today</a> tab.
 </p>
 
@@ -12,18 +12,31 @@
   <p class="msg" role="status">{{ message() }}</p>
 }
 
-@for (day of days; track day) {
-  <section class="day">
+<div class="day-picker-bar">
+  <button type="button" class="day-nav" (click)="prevEditorDay()" aria-label="Previous day">←</button>
+  <label class="day-picker">
+    <span class="picker-label-text">Day</span>
+    <select [ngModel]="selectedDay()" (ngModelChange)="onSelectDay($event)">
+      @for (d of days; track d) {
+        <option [ngValue]="d">{{ dayLabel(d) }} · {{ exerciseCountLabel(d) }}</option>
+      }
+    </select>
+  </label>
+  <button type="button" class="day-nav" (click)="nextEditorDay()" aria-label="Next day">→</button>
+</div>
+
+@let day = selectedDay();
+
+<section class="day">
     <div class="day-head">
       <h2>{{ dayLabel(day) }}</h2>
-      <button type="button" (click)="addExercise(day)">+ Add exercise</button>
     </div>
     @if (draft()[day].length === 0) {
-      <p class="empty">Rest day — or add exercises.</p>
+      <p class="empty">Rest day — or add exercises below.</p>
     } @else {
       <ul>
         @for (ex of draft()[day]; track ex.exerciseKey) {
-          <li class="ex-card">
+          <li class="ex-card" [id]="'program-ex-' + ex.exerciseKey">
             <div class="ex-row">
               <label class="field grow">
                 <span class="field-label">Name</span>
@@ -75,8 +88,10 @@
         }
       </ul>
     }
-  </section>
-}
+    <div class="day-actions">
+      <button type="button" class="add-exercise" (click)="addExercise(day)">+ Add exercise</button>
+    </div>
+</section>
 
 <div class="footer">
   <button type="button" class="save" [disabled]="busy()" (click)="save()">{{ busy() ? 'Saving…' : 'Save template' }}</button>

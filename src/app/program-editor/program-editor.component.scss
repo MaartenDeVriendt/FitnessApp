@@ -46,6 +46,73 @@ h1 {
   margin-bottom: 1.25rem;
 }
 
+.day-picker-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.day-nav {
+  flex-shrink: 0;
+  width: 2.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition);
+}
+
+.day-nav:hover {
+  background: var(--accent-subtle);
+  border-color: rgba(45, 212, 191, 0.35);
+  color: var(--accent);
+}
+
+.day-picker {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.picker-label-text {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.day-picker select {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: var(--font-display);
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.day-picker select:focus {
+  outline: none;
+  border-color: rgba(45, 212, 191, 0.45);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
 .day {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -55,11 +122,6 @@ h1 {
 }
 
 .day-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
   margin-bottom: 0.65rem;
 }
 
@@ -71,23 +133,40 @@ h1 {
   letter-spacing: -0.02em;
 }
 
-.day-head button {
-  padding: 0.4rem 0.75rem;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-2);
-  color: var(--accent);
-  cursor: pointer;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  transition:
-    background var(--transition),
-    border-color var(--transition);
+.day-actions {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px dashed var(--border-strong);
 }
 
-.day-head button:hover {
+.add-exercise {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(45, 212, 191, 0.45);
+  background: rgba(45, 212, 191, 0.06);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    transform 0.12s ease;
+}
+
+.add-exercise:hover {
   background: var(--accent-subtle);
-  border-color: rgba(45, 212, 191, 0.35);
+  border-color: rgba(45, 212, 191, 0.65);
+}
+
+.add-exercise:active {
+  transform: scale(0.99);
 }
 
 .empty {

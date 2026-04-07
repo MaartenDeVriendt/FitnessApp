@@ -1,4 +1,4 @@
-import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { afterNextRender, Component, DestroyRef, inject, Injector, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -9,7 +9,7 @@ import {
   type ProgramExercise,
   type WeeklyProgram,
 } from '../models/weekly.models';
-import { DAYS, dayLabel, type DayOfWeek } from '../weekly/weekly-utils';
+import { DAYS, dayLabel, dayOfWeekFromDate, type DayOfWeek } from '../weekly/weekly-utils';
 
 @Component({
   selector: 'app-program-editor',
@@ -20,10 +20,13 @@ import { DAYS, dayLabel, type DayOfWeek } from '../weekly/weekly-utils';
 export class ProgramEditorComponent implements OnInit {
   private readonly weeklyService = inject(WeeklyService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
 
   draft = signal<WeeklyProgram>(structuredClone(EMPTY_WEEKLY_PROGRAM));
   busy = signal(false);
   message = signal<string | null>(null);
+  /** Which weekday is shown in the editor (dropdown + prev/next). */
+  selectedDay = signal<DayOfWeek>(dayOfWeekFromDate(new Date()));
 
   readonly days = DAYS;
   dayLabel = dayLabel;
@@ -40,9 +43,29 @@ export class ProgramEditorComponent implements OnInit {
       .subscribe((p) => this.draft.set(structuredClone(p)));
   }
 
+  onSelectDay(day: DayOfWeek): void {
+    this.selectedDay.set(day);
+  }
+
+  prevEditorDay(): void {
+    const i = DAYS.indexOf(this.selectedDay());
+    this.selectedDay.set(DAYS[(i - 1 + DAYS.length) % DAYS.length]!);
+  }
+
+  nextEditorDay(): void {
+    const i = DAYS.indexOf(this.selectedDay());
+    this.selectedDay.set(DAYS[(i + 1) % DAYS.length]!);
+  }
+
+  exerciseCountLabel(day: DayOfWeek): string {
+    const n = this.draft()[day].length;
+    return n === 1 ? '1 exercise' : `${n} exercises`;
+  }
+
   addExercise(day: DayOfWeek): void {
+    const exerciseKey = crypto.randomUUID();
     const row: ProgramExercise = {
-      exerciseKey: crypto.randomUUID(),
+      exerciseKey,
       name: '',
       notes: '',
       kind: 'strength',
@@ -52,6 +75,15 @@ export class ProgramEditorComponent implements OnInit {
       ...d,
       [day]: [...d[day], row],
     }));
+    afterNextRender(
+      () => {
+        const el = document.getElementById(`program-ex-${exerciseKey}`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const nameInput = el?.querySelector<HTMLInputElement>('.ex-row input');
+        nameInput?.focus();
+      },
+      { injector: this.injector },
+    );
   }
 
   removeExercise(day: DayOfWeek, exerciseKey: string): void {
