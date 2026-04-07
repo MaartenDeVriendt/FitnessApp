@@ -6,7 +6,7 @@
 </div>
 
 <p class="intro">
-  Swipe the <strong>day strip</strong> to pick a weekday (defaults to <strong>today</strong>). Use ← → to change the calendar week. For strength we show
+  Swipe the <strong>day strip</strong> to pick a weekday (defaults to <strong>today</strong>). Use ← → to change the calendar week. Tap <strong>Complete</strong> when you finish an exercise — it moves to the bottom and the next one stays on top with a <strong>Next</strong> label. For strength we show
   <strong>last week</strong> and <strong>best ever</strong> per set; for cardio, duration (minutes) with last week and longest logged.
 </p>
 
@@ -56,13 +56,36 @@
   @if (program()[day].length === 0) {
     <p class="empty-day">No exercises for {{ dayLabel(day) }}. Add them in <a routerLink="/program">Edit week template</a>.</p>
   } @else {
-    @for (ex of program()[day]; track ex.exerciseKey) {
-      <div class="exercise-block">
+    @let sortedEx = exercisesSortedForDay(day);
+    @let splitIdx = firstCompletedSortIndex(sortedEx, day);
+    @for (ex of sortedEx; track ex.exerciseKey; let i = $index) {
+      @if (splitIdx > 0 && i === splitIdx) {
+        <div class="completed-divider" role="separator" aria-label="Completed exercises">Completed</div>
+      }
+      <div class="exercise-block" [class.exercise-done]="isExerciseComplete(day, ex)">
         <div class="exercise-head">
-          <h3>{{ ex.name }}</h3>
-          @if (resolvedExerciseKind(ex) === 'cardio') {
-            <span class="kind-pill cardio">Cardio</span>
-          }
+          <div class="exercise-title-row">
+            <div class="title-stack">
+              <h3>{{ ex.name }}</h3>
+              <div class="title-meta">
+                @if (isNextUp(day, ex)) {
+                  <span class="next-pill" aria-hidden="true">Next</span>
+                }
+                @if (resolvedExerciseKind(ex) === 'cardio') {
+                  <span class="kind-pill cardio">Cardio</span>
+                }
+              </div>
+            </div>
+            <button
+              type="button"
+              class="complete-btn"
+              [class.is-complete]="isExerciseComplete(day, ex)"
+              [attr.aria-pressed]="isExerciseComplete(day, ex)"
+              (click)="toggleExerciseComplete(day, ex)"
+            >
+              {{ isExerciseComplete(day, ex) ? 'Completed' : 'Complete' }}
+            </button>
+          </div>
           @if (ex.notes?.trim()) {
             <p class="ex-notes">{{ ex.notes }}</p>
           }

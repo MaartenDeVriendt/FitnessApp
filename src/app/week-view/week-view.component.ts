@@ -37,8 +37,8 @@ import type { WeekDayLogWithId } from '../models/weekly.models';
 import { FormsModule } from '@angular/forms';
 
 type DraftEntry =
-  | { kind: 'strength'; weights: number[] }
-  | { kind: 'cardio'; minutes: number };
+  | { kind: 'strength'; weights: number[]; completed: boolean }
+  | { kind: 'cardio'; minutes: number; completed: boolean };
 
 type DraftMap = Record<string, DraftEntry>;
 
@@ -194,7 +194,8 @@ export class WeekViewComponent {
       let weights: number[] = cur?.kind === 'strength' ? [...cur.weights] : Array(n).fill(0);
       while (weights.length < n) weights.push(0);
       weights[setIdx] = v;
-      return { ...m, [key]: { kind: 'strength', weights } };
+      const done = cur?.kind === 'strength' ? cur.completed : false;
+      return { ...m, [key]: { kind: 'strength', weights, completed: done } };
     });
   }
 
@@ -208,7 +209,9 @@ export class WeekViewComponent {
     const key = this.draftKey(day, ex.exerciseKey);
     const num = typeof value === 'string' ? parseFloat(value) : value;
     const minutes = Number.isFinite(num) ? num : 0;
-    this.draft.update((m) => ({ ...m, [key]: { kind: 'cardio', minutes } }));
+    const cur = this.draft()[key];
+    const done = cur?.kind === 'cardio' ? cur.completed : false;
+    this.draft.update((m) => ({ ...m, [key]: { kind: 'cardio', minutes, completed: done } }));
   }
 
   lastWeekSetKg(day: DayOfWeek, exerciseKey: string, setIdx: number): number | null {
@@ -240,38 +243,95 @@ export class WeekViewComponent {
     return v != null && v > 0 ? v : null;
   }
 
+  isExerciseComplete(day: DayOfWeek, ex: ProgramExercise): boolean {
+    const d = this.draft()[this.draftKey(day, ex.exerciseKey)];
+    return d?.completed === true;
+  }
+
+  /** Program order: not completed first, then completed (stable within each group). */
+  exercisesSortedForDay(day: DayOfWeek): ProgramExercise[] {
+    const prog = this.program()[day];
+    const incomplete = prog.filter((ex) => !this.isExerciseComplete(day, ex));
+    const complete = prog.filter((ex) => this.isExerciseComplete(day, ex));
+    return [...incomplete, ...complete];
+  }
+
+  /** First index in `sorted` where the exercise is completed, or -1 if none. */
+  firstCompletedSortIndex(sorted: ProgramExercise[], day: DayOfWeek): number {
+    return sorted.findIndex((ex) => this.isExerciseComplete(day, ex));
+  }
+
+  /** Highlights the next exercise to do (first incomplete in display order). */
+  isNextUp(day: DayOfWeek, ex: ProgramExercise): boolean {
+    const sorted = this.exercisesSortedForDay(day);
+    const next = sorted.find((e) => !this.isExerciseComplete(day, e));
+    return next !== undefined && next.exerciseKey === ex.exerciseKey;
+  }
+
+  async toggleExerciseComplete(day: DayOfWeek, ex: ProgramExercise): Promise<void> {
+    const key = this.draftKey(day, ex.exerciseKey);
+    const before = this.draft()[key];
+    if (!before) return;
+    const nextCompleted = !before.completed;
+    this.draft.update((m) => {
+      const cur = m[key];
+      if (!cur) return m;
+      return { ...m, [key]: { ...cur, completed: nextCompleted } };
+    });
+    try {
+      await this.persistDay(day);
+    } catch {
+      this.draft.update((m) => {
+        const cur = m[key];
+        if (!cur) return m;
+        return { ...m, [key]: { ...cur, completed: before.completed } };
+      });
+    }
+  }
+
   async saveDay(day: DayOfWeek): Promise<void> {
     const prog = this.program()[day];
     if (prog.length === 0) return;
     this.savingDay.set(day);
     try {
-      const exercises: WeekLogExercise[] = prog.map((ex) => {
-        const key = this.draftKey(day, ex.exerciseKey);
-        const d = this.draft()[key];
-        if (resolvedExerciseKind(ex) === 'cardio') {
-          const minutes = d?.kind === 'cardio' ? d.minutes : 0;
-          return {
-            exerciseKey: ex.exerciseKey,
-            name: ex.name,
-            kind: 'cardio' as const,
-            durationMinutes: Number.isFinite(minutes) ? minutes : 0,
-          };
-        }
-        const n = resolvedSetCount(ex);
-        const weights =
-          d?.kind === 'strength' ? [...d.weights] : Array(n).fill(0);
-        while (weights.length < n) weights.push(0);
-        return {
-          exerciseKey: ex.exerciseKey,
-          name: ex.name,
-          kind: 'strength' as const,
-          sets: weights.slice(0, n),
-        };
-      });
-      await this.weeklyService.saveWeekDayLog(this.weekMonday(), day, exercises);
+      await this.persistDay(day);
     } finally {
       this.savingDay.set(null);
     }
+  }
+
+  private logExercisesFromDraft(day: DayOfWeek): WeekLogExercise[] {
+    const prog = this.program()[day];
+    return prog.map((ex) => {
+      const key = this.draftKey(day, ex.exerciseKey);
+      const d = this.draft()[key];
+      const completed = d?.completed === true;
+      if (resolvedExerciseKind(ex) === 'cardio') {
+        const minutes = d?.kind === 'cardio' ? d.minutes : 0;
+        return {
+          exerciseKey: ex.exerciseKey,
+          name: ex.name,
+          kind: 'cardio' as const,
+          durationMinutes: Number.isFinite(minutes) ? minutes : 0,
+          ...(completed ? { completed: true } : {}),
+        };
+      }
+      const n = resolvedSetCount(ex);
+      const weights = d?.kind === 'strength' ? [...d.weights] : Array(n).fill(0);
+      while (weights.length < n) weights.push(0);
+      return {
+        exerciseKey: ex.exerciseKey,
+        name: ex.name,
+        kind: 'strength' as const,
+        sets: weights.slice(0, n),
+        ...(completed ? { completed: true } : {}),
+      };
+    });
+  }
+
+  private async persistDay(day: DayOfWeek): Promise<void> {
+    const exercises = this.logExercisesFromDraft(day);
+    await this.weeklyService.saveWeekDayLog(this.weekMonday(), day, exercises);
   }
 
   private scrollActiveDayIntoView(): void {
@@ -289,6 +349,7 @@ export class WeekViewComponent {
       for (const ex of program[d]) {
         const key = this.draftKey(d, ex.exerciseKey);
         const found = log?.exercises.find((e) => e.exerciseKey === ex.exerciseKey);
+        const completed = found?.completed === true;
         if (resolvedExerciseKind(ex) === 'cardio') {
           let minutes = 0;
           if (
@@ -298,7 +359,7 @@ export class WeekViewComponent {
           ) {
             minutes = found.durationMinutes;
           }
-          next[key] = { kind: 'cardio', minutes };
+          next[key] = { kind: 'cardio', minutes, completed };
         } else {
           const n = resolvedSetCount(ex);
           const weights = Array(n).fill(0);
@@ -307,7 +368,7 @@ export class WeekViewComponent {
               weights[i] = found.sets[i] ?? 0;
             }
           }
-          next[key] = { kind: 'strength', weights };
+          next[key] = { kind: 'strength', weights, completed };
         }
       }
     }

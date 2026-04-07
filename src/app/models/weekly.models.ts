@@ -39,6 +39,8 @@ export interface WeekLogExercise {
   sets?: number[];
   /** Cardio: duration in minutes (decimals ok, e.g. 0.5 for 30s). */
   durationMinutes?: number | null;
+  /** User marked this exercise done for that day (optional in Firestore for older logs). */
+  completed?: boolean;
 }
 
 export interface WeekDayLog {

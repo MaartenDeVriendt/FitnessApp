@@ -112,6 +112,7 @@ export class WeeklyService {
     const id = weekLogDocId(weekMonday, day);
     const d = doc(this.firestore, 'users', uid, WEEK_LOGS_COLLECTION, id);
     const payload = exercises.map((e) => {
+      const completed = e.completed === true;
       if (e.kind === 'cardio') {
         const dm = e.durationMinutes;
         return {
@@ -120,6 +121,7 @@ export class WeeklyService {
           kind: 'cardio' as const,
           durationMinutes:
             dm == null || !Number.isFinite(Number(dm)) ? null : Number(dm),
+          ...(completed ? { completed: true } : {}),
         };
       }
       return {
@@ -127,6 +129,7 @@ export class WeeklyService {
         name: e.name.trim(),
         kind: 'strength' as const,
         sets: (e.sets ?? []).map((x) => Number(x)),
+        ...(completed ? { completed: true } : {}),
       };
     });
     await setDoc(
@@ -297,6 +300,7 @@ export class WeeklyService {
     const kind: ExerciseKind = e['kind'] === 'cardio' ? 'cardio' : 'strength';
     const name = String(e['name'] ?? '');
     const exerciseKey = String(e['exerciseKey'] ?? '');
+    const completed = e['completed'] === true;
     if (kind === 'cardio') {
       const dm = e['durationMinutes'];
       let durationMinutes: number | null = null;
@@ -305,7 +309,7 @@ export class WeeklyService {
         const p = parseFloat(dm);
         if (Number.isFinite(p)) durationMinutes = p;
       }
-      return { exerciseKey, name, kind: 'cardio', durationMinutes };
+      return { exerciseKey, name, kind: 'cardio', durationMinutes, ...(completed ? { completed: true } : {}) };
     }
     const setsRaw = e['sets'];
     let sets: number[] = [0, 0, 0];
@@ -313,7 +317,7 @@ export class WeeklyService {
       sets = setsRaw.map((x) => Number(x)).map((n) => (Number.isFinite(n) ? n : 0));
       if (sets.length === 0) sets = [0, 0, 0];
     }
-    return { exerciseKey, name, kind: 'strength', sets };
+    return { exerciseKey, name, kind: 'strength', sets, ...(completed ? { completed: true } : {}) };
   }
 
   private sanitizeProgram(program: WeeklyProgram): WeeklyProgram {

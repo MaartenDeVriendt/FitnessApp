@@ -319,7 +319,19 @@ button.primary:disabled {
   margin-bottom: 0.85rem;
 }
 
-.exercise-head h3 {
+.exercise-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.title-stack {
+  min-width: 0;
+  flex: 1;
+}
+
+.title-stack h3 {
   margin: 0 0 0.35rem;
   font-size: 0.95rem;
   font-family: var(--font-display);
@@ -328,9 +340,92 @@ button.primary:disabled {
   letter-spacing: -0.02em;
 }
 
+.title-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.next-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  background: rgba(45, 212, 191, 0.2);
+  border: 1px solid rgba(45, 212, 191, 0.45);
+  color: var(--accent);
+}
+
+.complete-btn {
+  flex-shrink: 0;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition);
+}
+
+.complete-btn:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+
+.complete-btn.is-complete {
+  background: rgba(45, 212, 191, 0.12);
+  border-color: rgba(45, 212, 191, 0.4);
+  color: var(--accent);
+}
+
+.completed-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0.85rem;
+  padding-left: 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.completed-divider::before,
+.completed-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-strong);
+}
+
+.completed-divider::before {
+  max-width: 2rem;
+}
+
+.exercise-block.exercise-done .title-stack h3 {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.exercise-block.exercise-done .sets-grid,
+.exercise-block.exercise-done .cardio-block {
+  opacity: 0.55;
+}
+
 .kind-pill {
   display: inline-block;
-  margin-bottom: 0.35rem;
   padding: 0.2rem 0.5rem;
   border-radius: 999px;
   font-size: 0.65rem;
