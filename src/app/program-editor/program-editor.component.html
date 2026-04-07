@@ -1,0 +1,38 @@
+<div class="head">
+  <h1>Edit week template</h1>
+  <a routerLink="/week" class="back">← Back to this week</a>
+</div>
+
+<p class="hint">
+  Set which exercises you do on each weekday. This <strong>repeats every week</strong>. Logging happens on the
+  <a routerLink="/week">week view</a> (weights + last week + best ever per set).
+</p>
+
+@if (message()) {
+  <p class="msg" role="status">{{ message() }}</p>
+}
+
+@for (day of days; track day) {
+  <section class="day">
+    <div class="day-head">
+      <h2>{{ dayLabel(day) }}</h2>
+      <button type="button" (click)="addExercise(day)">+ Add exercise</button>
+    </div>
+    @if (draft()[day].length === 0) {
+      <p class="empty">Rest day — or add exercises.</p>
+    } @else {
+      <ul>
+        @for (ex of draft()[day]; track ex.exerciseKey) {
+          <li>
+            <input type="text" [ngModel]="ex.name" (ngModelChange)="updateName(day, ex.exerciseKey, $event)" />
+            <button type="button" class="remove" (click)="removeExercise(day, ex.exerciseKey)">Remove</button>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+}
+
+<div class="footer">
+  <button type="button" class="save" [disabled]="busy()" (click)="save()">{{ busy() ? 'Saving…' : 'Save template' }}</button>
+</div>

@@ -1,0 +1,30 @@
+<div class="login">
+  <h1>{{ mode() === 'login' ? 'Sign in' : 'Create account' }}</h1>
+  <p class="hint">Firebase Auth (email / password). Data stays under your UID in Firestore.</p>
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+
+  <form (ngSubmit)="submit()" #f="ngForm">
+    @if (mode() === 'signup') {
+      <label>
+        Display name (optional)
+        <input name="displayName" [(ngModel)]="displayName" type="text" autocomplete="name" />
+      </label>
+    }
+    <label>
+      Email
+      <input name="email" [(ngModel)]="email" type="email" required autocomplete="email" />
+    </label>
+    <label>
+      Password
+      <input name="password" [(ngModel)]="password" type="password" required minlength="6" autocomplete="current-password" />
+    </label>
+    <button type="submit" [disabled]="!f.valid || busy()">{{ mode() === 'login' ? 'Sign in' : 'Sign up' }}</button>
+  </form>
+
+  <button type="button" class="linkish" (click)="toggleMode()">
+    {{ mode() === 'login' ? 'Need an account? Sign up' : 'Have an account? Sign in' }}
+  </button>
+</div>

@@ -1,0 +1,119 @@
+.head {
+  margin-bottom: 0.5rem;
+}
+
+h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+}
+
+.back {
+  font-size: 0.9rem;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.hint {
+  color: #52525b;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin-bottom: 1.25rem;
+}
+
+.msg {
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #166534;
+  font-size: 0.9rem;
+}
+
+.day {
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  background: #fff;
+}
+
+.day-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.day-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.day-head button {
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #d4d4d8;
+  background: #fafafa;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #a1a1aa;
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+li input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid #d4d4d8;
+  font: inherit;
+}
+
+.remove {
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  cursor: pointer;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.footer {
+  margin-top: 1.25rem;
+}
+
+.save {
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  border: none;
+  background: #18181b;
+  color: #fafafa;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.save:disabled {
+  opacity: 0.55;
+}

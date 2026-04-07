@@ -1,0 +1,60 @@
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+  color: #18181b;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid #e4e4e7;
+  background: #fff;
+}
+
+.brand {
+  font-weight: 700;
+  text-decoration: none;
+  color: inherit;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+nav a {
+  text-decoration: none;
+  color: #3f3f46;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+nav a.active {
+  color: #18181b;
+  text-decoration: underline;
+}
+
+.ghost {
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid #d4d4d8;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.main {
+  flex: 1;
+  padding: 1rem 1.25rem 2rem;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}

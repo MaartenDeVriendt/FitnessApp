@@ -1,0 +1,68 @@
+.login {
+  max-width: 22rem;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  border-radius: 12px;
+  background: var(--surface, #f4f4f5);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.08);
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+}
+
+.hint {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--muted, #52525b);
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+input {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  font: inherit;
+}
+
+button[type='submit'] {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #18181b;
+  color: #fafafa;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button[type='submit']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.linkish {
+  margin-top: 1rem;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 0.875rem;
+  text-decoration: underline;
+}
+
+.error {
+  color: #b91c1c;
+  font-size: 0.875rem;
+}

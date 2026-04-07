@@ -1,0 +1,26 @@
+<h1>Personal records</h1>
+<p class="hint">Highest weight (kg) you logged on <strong>set 1, 2, and 3</strong> for each exercise, across all weeks.</p>
+
+@let rows = records().filter((r) => r.bestKg > 0);
+@if (rows.length === 0) {
+  <p class="empty">Log weights on the week view to build history.</p>
+} @else {
+  <table>
+    <thead>
+      <tr>
+        <th>Exercise</th>
+        <th>Set</th>
+        <th>Best (kg)</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (r of rows; track r.exerciseKey + '-' + r.setIndex) {
+        <tr>
+          <td>{{ r.exerciseName }}</td>
+          <td>{{ r.setIndex }}</td>
+          <td>{{ r.bestKg }}</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}
