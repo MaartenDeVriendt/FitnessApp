@@ -1,6 +1,7 @@
 import {
   afterNextRender,
   Component,
+  DestroyRef,
   effect,
   ElementRef,
   inject,
@@ -62,7 +63,12 @@ function emptyLogsRecord(): Record<DayOfWeek, WeekDayLogWithId | null> {
 })
 export class WeekViewComponent {
   private readonly weeklyService = inject(WeeklyService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly dayStripRef = viewChild<ElementRef<HTMLElement>>('dayStrip');
+
+  /** Debounced writes after editing weights or cardio (ms). */
+  private readonly autosaveDelayMs = 800;
+  private readonly autosaveTimers = new Map<DayOfWeek, ReturnType<typeof setTimeout>>();
 
   readonly weekMonday = signal(mondayOfWeekContaining(new Date()));
   readonly selectedDay = signal<DayOfWeek>(dayOfWeekFromDate(new Date()));
@@ -120,6 +126,47 @@ export class WeekViewComponent {
     });
 
     afterNextRender(() => this.scrollActiveDayIntoView());
+
+    effect(() => {
+      this.weekMonday();
+      untracked(() => this.clearAllAutosaveTimers());
+    });
+
+    this.destroyRef.onDestroy(() => this.clearAllAutosaveTimers());
+  }
+
+  private clearAutosaveTimer(day: DayOfWeek): void {
+    const t = this.autosaveTimers.get(day);
+    if (t) {
+      clearTimeout(t);
+      this.autosaveTimers.delete(day);
+    }
+  }
+
+  private clearAllAutosaveTimers(): void {
+    for (const t of this.autosaveTimers.values()) clearTimeout(t);
+    this.autosaveTimers.clear();
+  }
+
+  /** Queue a Firestore write after the user pauses editing (weights / cardio only). */
+  private queueAutosave(day: DayOfWeek): void {
+    if (this.program()[day].length === 0) return;
+    const weekKey = formatLocalDate(this.weekMonday());
+    this.clearAutosaveTimer(day);
+    const t = setTimeout(() => {
+      this.autosaveTimers.delete(day);
+      if (formatLocalDate(this.weekMonday()) !== weekKey) return;
+      void this.autosaveDay(day);
+    }, this.autosaveDelayMs);
+    this.autosaveTimers.set(day, t);
+  }
+
+  private async autosaveDay(day: DayOfWeek): Promise<void> {
+    try {
+      await this.persistDay(day);
+    } catch (e) {
+      console.error('Auto-save failed', e);
+    }
   }
 
   setIndexes(ex: ProgramExercise): number[] {
@@ -197,6 +244,7 @@ export class WeekViewComponent {
       const done = cur?.kind === 'strength' ? cur.completed : false;
       return { ...m, [key]: { kind: 'strength', weights, completed: done } };
     });
+    this.queueAutosave(day);
   }
 
   getCardioMinutes(day: DayOfWeek, ex: ProgramExercise): number {
@@ -212,6 +260,7 @@ export class WeekViewComponent {
     const cur = this.draft()[key];
     const done = cur?.kind === 'cardio' ? cur.completed : false;
     this.draft.update((m) => ({ ...m, [key]: { kind: 'cardio', minutes, completed: done } }));
+    this.queueAutosave(day);
   }
 
   lastWeekSetKg(day: DayOfWeek, exerciseKey: string, setIdx: number): number | null {
@@ -292,6 +341,7 @@ export class WeekViewComponent {
   async saveDay(day: DayOfWeek): Promise<void> {
     const prog = this.program()[day];
     if (prog.length === 0) return;
+    this.clearAutosaveTimer(day);
     this.savingDay.set(day);
     try {
       await this.persistDay(day);
@@ -330,6 +380,7 @@ export class WeekViewComponent {
   }
 
   private async persistDay(day: DayOfWeek): Promise<void> {
+    this.clearAutosaveTimer(day);
     const exercises = this.logExercisesFromDraft(day);
     await this.weeklyService.saveWeekDayLog(this.weekMonday(), day, exercises);
   }
