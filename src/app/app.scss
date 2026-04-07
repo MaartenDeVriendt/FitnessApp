@@ -15,7 +15,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem;
   padding: 0.65rem 1.25rem;
   padding-top: max(0.65rem, env(safe-area-inset-top));
   background: rgba(12, 12, 14, 0.72);
@@ -37,8 +37,8 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  max-width: min(42vw, 11rem);
   min-width: 0;
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -51,16 +51,20 @@
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 14px var(--accent-glow);
+  flex-shrink: 0;
 }
 
-nav {
+/* —— Desktop nav —— */
+.nav-desktop {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.35rem;
+  flex-shrink: 0;
 }
 
-nav a {
+.nav-desktop a {
   text-decoration: none;
   color: var(--text-secondary);
   font-weight: 500;
@@ -74,12 +78,12 @@ nav a {
     border-color var(--transition);
 }
 
-nav a:hover {
+.nav-desktop a:hover {
   color: var(--text);
   background: var(--surface);
 }
 
-nav a.active {
+.nav-desktop a.active {
   color: var(--bg-deep);
   background: var(--accent);
   border-color: rgba(255, 255, 255, 0.1);
@@ -105,6 +109,261 @@ nav a.active {
   color: var(--text);
   border-color: var(--text-muted);
   background: var(--surface);
+}
+
+/* —— Hamburger (mobile only) —— */
+.menu-btn {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.65rem;
+  height: 2.65rem;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition);
+}
+
+.menu-btn:hover {
+  border-color: var(--text-muted);
+  background: var(--surface);
+}
+
+.menu-icon {
+  position: relative;
+  display: block;
+  width: 1.15rem;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+  transition: background 0.15s ease;
+}
+
+.menu-icon::before,
+.menu-icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+  transition:
+    transform 0.2s ease,
+    top 0.2s ease;
+}
+
+.menu-icon::before {
+  top: -6px;
+}
+
+.menu-icon::after {
+  top: 6px;
+}
+
+.menu-btn.open .menu-icon {
+  background: transparent;
+}
+
+.menu-btn.open .menu-icon::before {
+  top: 0;
+  transform: rotate(45deg);
+}
+
+.menu-btn.open .menu-icon::after {
+  top: 0;
+  transform: rotate(-45deg);
+}
+
+/* —— Mobile drawer + backdrop —— */
+.nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease;
+  pointer-events: none;
+}
+
+.nav-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 61;
+  width: min(19rem, 88vw);
+  max-width: 100%;
+  padding: max(0.75rem, env(safe-area-inset-top)) 0 max(1rem, env(safe-area-inset-bottom));
+  padding-left: 1rem;
+  padding-right: 1rem;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  visibility: hidden;
+}
+
+.nav-drawer.open {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+.drawer-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawer-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.drawer-close {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+
+.drawer-close:hover {
+  color: var(--text);
+  background: var(--bg-elevated);
+}
+
+.drawer-current {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.drawer-current strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.drawer-nav a {
+  display: block;
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  transition:
+    color var(--transition),
+    background var(--transition),
+    border-color var(--transition);
+}
+
+.drawer-nav a:hover {
+  color: var(--text);
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+.drawer-nav a.active {
+  color: var(--bg-deep);
+  background: var(--accent);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.drawer-signout {
+  margin-top: auto;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--transition),
+    border-color var(--transition),
+    background var(--transition);
+}
+
+.drawer-signout:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+  background: var(--surface-2);
+}
+
+@media (max-width: 42rem) {
+  .nav-desktop {
+    display: none;
+  }
+
+  .menu-btn {
+    display: flex;
+  }
+
+  .brand {
+    flex: 1;
+  }
+}
+
+@media (min-width: 42.01rem) {
+  .nav-backdrop,
+  .nav-drawer {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-backdrop,
+  .nav-drawer,
+  .menu-icon,
+  .menu-icon::before,
+  .menu-icon::after {
+    transition: none;
+  }
 }
 
 .main {
