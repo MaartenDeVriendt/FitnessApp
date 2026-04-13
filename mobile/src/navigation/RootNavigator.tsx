@@ -1,19 +1,18 @@
-import { ActivityIndicator, Dimensions, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
-import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
-import { ShellHeader } from '../components/ShellHeader';
 import { LoginScreen } from '../screens/LoginScreen';
 import { WeekViewScreen } from '../screens/WeekViewScreen';
 import { ProgramEditorScreen } from '../screens/ProgramEditorScreen';
 import { PrSummaryScreen } from '../screens/PrSummaryScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
-import { DrawerContent } from './DrawerContent';
-import { tokens } from '../theme/tokens';
+import { fonts, tokens } from '../theme/tokens';
 
-export type DrawerParamList = {
+export type MainTabParamList = {
   Today: undefined;
   Template: undefined;
   PRs: undefined;
@@ -32,34 +31,69 @@ const navTheme = {
   },
 };
 
-const Drawer = createDrawerNavigator<DrawerParamList>();
-const drawerWidth = Math.min(304, Dimensions.get('window').width * 0.88);
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
-function MainDrawer() {
+function tabIcon(name: keyof MainTabParamList, focused: boolean) {
+  switch (name) {
+    case 'Today':
+      return focused ? 'calendar' : 'calendar-outline';
+    case 'Template':
+      return focused ? 'layers' : 'layers-outline';
+    case 'PRs':
+      return focused ? 'trophy' : 'trophy-outline';
+    case 'Profile':
+      return focused ? 'person-circle' : 'person-circle-outline';
+    default:
+      return 'ellipse-outline' as const;
+  }
+}
+
+function MainTabs() {
   return (
-    <Drawer.Navigator
-      drawerContent={(props) => <DrawerContent {...props} />}
-      screenOptions={{
-        drawerPosition: 'right',
-        headerShown: true,
-        header: (props) => <ShellHeader {...props} />,
-        drawerStyle: {
-          width: drawerWidth,
-          backgroundColor: tokens.surface,
-          borderLeftWidth: 1,
-          borderLeftColor: tokens.border,
-        },
-        overlayColor: 'rgba(0, 0, 0, 0.55)',
-        drawerType: 'front',
-      }}
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: tokens.accent,
+        tabBarInactiveTintColor: tokens.textMuted,
+        tabBarHideOnKeyboard: true,
+        tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarIcon: ({ color, focused, size }) => (
+          <Ionicons name={tabIcon(route.name, focused)} size={size} color={color} />
+        ),
+      })}
     >
-      <Drawer.Screen name="Today" component={WeekViewScreen} options={{ title: 'Today' }} />
-      <Drawer.Screen name="Template" component={ProgramEditorScreen} options={{ title: 'Week template' }} />
-      <Drawer.Screen name="PRs" component={PrSummaryScreen} options={{ title: 'PRs' }} />
-      <Drawer.Screen name="Profile" component={ProfileScreen} />
-    </Drawer.Navigator>
+      <Tab.Screen
+        name="Today"
+        component={WeekViewScreen}
+        options={{ tabBarLabel: 'Today' }}
+      />
+      <Tab.Screen
+        name="Template"
+        component={ProgramEditorScreen}
+        options={{ tabBarLabel: 'Template' }}
+      />
+      <Tab.Screen name="PRs" component={PrSummaryScreen} options={{ tabBarLabel: 'PRs' }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: 'Profile' }} />
+    </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: tokens.surface,
+    borderTopColor: tokens.border,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 6,
+  },
+  tabLabel: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    marginBottom: 2,
+  },
+});
 
 const Stack = createNativeStackNavigator();
 
@@ -81,7 +115,7 @@ export function RootNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} />
         </Stack.Navigator>
       ) : (
-        <MainDrawer />
+        <MainTabs />
       )}
     </NavigationContainer>
   );

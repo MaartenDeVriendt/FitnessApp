@@ -15,7 +15,7 @@ import { GradientBackground } from '../ui/GradientBackground';
 import { fonts, tokens } from '../theme/tokens';
 
 export function ProfileScreen() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const profile = useProfile(user ?? null);
 
   const [nickname, setNickname] = useState('');
@@ -145,6 +145,10 @@ export function ProfileScreen() {
           )}
         </LinearGradient>
       </Pressable>
+
+      <Pressable style={styles.signOut} onPress={() => void signOut()} accessibilityRole="button">
+        <Text style={styles.signOutText}>Sign out</Text>
+      </Pressable>
     </ScrollView>
     </GradientBackground>
   );
@@ -223,5 +227,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#042f2e',
     fontSize: 15,
+  },
+  signOut: {
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: tokens.radiusMd,
+    borderWidth: 1,
+    borderColor: tokens.borderStrong,
+    alignItems: 'center',
+  },
+  signOutText: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 15,
+    fontWeight: '600',
+    color: tokens.textSecondary,
   },
 });

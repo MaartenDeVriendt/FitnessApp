@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,10 +11,10 @@ import {
   View,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import type { DrawerNavigationProp } from '@react-navigation/drawer';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import type { DrawerParamList } from '../navigation/RootNavigator';
+import type { MainTabParamList } from '../navigation/RootNavigator';
 import { useAuth } from '../context/AuthContext';
 import {
   type ProgramExercise,
@@ -46,6 +47,12 @@ import { fonts, tokens } from '../theme/tokens';
 
 const WORKOUT_GATE_STORAGE_PREFIX = 'fitness_workout_gate_v1';
 const AUTOSAVE_MS = 800;
+/** iOS: updating draft every keystroke re-renders and fights UITextField; batch writes to draft. */
+const DRAFT_INPUT_DEBOUNCE_MS = 120;
+
+type PendingNumericField =
+  | { kind: 'strength'; day: DayOfWeek; ex: ProgramExercise; si: number }
+  | { kind: 'cardio'; day: DayOfWeek; ex: ProgramExercise };
 
 type DraftEntry =
   | { kind: 'strength'; weights: number[]; completed: boolean }
@@ -119,7 +126,7 @@ function buildWeekLogExercises(
 }
 
 export function WeekViewScreen() {
-  const navigation = useNavigation<DrawerNavigationProp<DrawerParamList>>();
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
   const { user } = useAuth();
   const uid = user?.uid ?? null;
 
@@ -138,6 +145,13 @@ export function WeekViewScreen() {
   const [weightTextOverlay, setWeightTextOverlay] = useState<Record<string, string>>({});
   const weightTextOverlayRef = useRef(weightTextOverlay);
   weightTextOverlayRef.current = weightTextOverlay;
+
+  const latestPendingDraftTextRef = useRef<Record<string, string>>({});
+  const draftDebounceTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingFieldMetaRef = useRef<Map<string, PendingNumericField>>(new Map());
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const flushAllPendingDraftInputsRef = useRef<() => void>(() => {});
 
   const program = useWeeklyProgram(uid);
   const logs = useWeekLogsForMonday(uid, weekMonday);
@@ -195,21 +209,25 @@ export function WeekViewScreen() {
   }, [program, logs]);
 
   useEffect(() => {
+    flushAllPendingDraftInputsRef.current();
     setWeightTextOverlay({});
   }, [selectedDay]);
+
+  useEffect(() => {
+    for (const t of autosaveTimers.current.values()) clearTimeout(t);
+    autosaveTimers.current.clear();
+    flushAllPendingDraftInputsRef.current();
+    setWeightTextOverlay({});
+  }, [weekMonday]);
 
   useEffect(() => {
     return () => {
       for (const t of autosaveTimers.current.values()) clearTimeout(t);
       autosaveTimers.current.clear();
+      for (const t of draftDebounceTimersRef.current.values()) clearTimeout(t);
+      draftDebounceTimersRef.current.clear();
     };
   }, []);
-
-  useEffect(() => {
-    for (const t of autosaveTimers.current.values()) clearTimeout(t);
-    autosaveTimers.current.clear();
-    setWeightTextOverlay({});
-  }, [weekMonday]);
 
   const clearAutosaveTimer = useCallback((day: DayOfWeek) => {
     const t = autosaveTimers.current.get(day);
@@ -219,30 +237,7 @@ export function WeekViewScreen() {
     }
   }, []);
 
-  const persistDay = useCallback(
-    async (day: DayOfWeek, draftMap?: DraftMap) => {
-      clearAutosaveTimer(day);
-      const map = draftMap ?? draft;
-      const exercises = buildWeekLogExercises(day, program, map);
-      await saveWeekDayLogRemote(weekMonday, day, exercises);
-    },
-    [clearAutosaveTimer, draft, program, weekMonday],
-  );
-
-  const queueAutosave = useCallback(
-    (day: DayOfWeek) => {
-      if (program[day].length === 0) return;
-      const wk = formatLocalDate(weekMonday);
-      clearAutosaveTimer(day);
-      const t = setTimeout(() => {
-        autosaveTimers.current.delete(day);
-        if (formatLocalDate(weekMonday) !== wk) return;
-        void persistDay(day).catch((e) => console.error('Auto-save failed', e));
-      }, AUTOSAVE_MS);
-      autosaveTimers.current.set(day, t);
-    },
-    [clearAutosaveTimer, persistDay, program, weekMonday],
-  );
+  const queueAutosaveRef = useRef<(d: DayOfWeek) => void>(() => {});
 
   const setIndexes = useCallback((ex: ProgramExercise) => {
     const n = resolvedSetCount(ex);
@@ -268,7 +263,7 @@ export function WeekViewScreen() {
       const done = cur?.kind === 'strength' ? cur.completed : false;
       return { ...m, [key]: { kind: 'strength', weights, completed: done } };
     });
-    queueAutosave(day);
+    queueAutosaveRef.current(day);
   };
 
   const getCardioMinutes = (day: DayOfWeek, ex: ProgramExercise): number => {
@@ -284,8 +279,81 @@ export function WeekViewScreen() {
     const cur = draft[key];
     const done = cur?.kind === 'cardio' ? cur.completed : false;
     setDraft((m) => ({ ...m, [key]: { kind: 'cardio', minutes, completed: done } }));
-    queueAutosave(day);
+    queueAutosaveRef.current(day);
   };
+
+  const setStrengthWeightRef = useRef(setStrengthWeight);
+  const setCardioMinutesRef = useRef(setCardioMinutes);
+  setStrengthWeightRef.current = setStrengthWeight;
+  setCardioMinutesRef.current = setCardioMinutes;
+
+  const flushAllPendingDraftInputs = useCallback(() => {
+    for (const [fk, timer] of [...draftDebounceTimersRef.current.entries()]) {
+      clearTimeout(timer);
+      draftDebounceTimersRef.current.delete(fk);
+      const text = latestPendingDraftTextRef.current[fk];
+      const m = pendingFieldMetaRef.current.get(fk);
+      if (!m || text === undefined) continue;
+      if (m.kind === 'strength') {
+        setStrengthWeightRef.current(m.day, m.ex, m.si, text);
+      } else {
+        setCardioMinutesRef.current(m.day, m.ex, text);
+      }
+    }
+  }, []);
+
+  flushAllPendingDraftInputsRef.current = flushAllPendingDraftInputs;
+
+  const scheduleDebouncedDraftInput = useCallback(
+    (fieldKey: string, meta: PendingNumericField, text: string) => {
+      latestPendingDraftTextRef.current[fieldKey] = text;
+      pendingFieldMetaRef.current.set(fieldKey, meta);
+      const prev = draftDebounceTimersRef.current.get(fieldKey);
+      if (prev) clearTimeout(prev);
+      const tid = setTimeout(() => {
+        draftDebounceTimersRef.current.delete(fieldKey);
+        const t = latestPendingDraftTextRef.current[fieldKey];
+        const m = pendingFieldMetaRef.current.get(fieldKey);
+        if (!m || t === undefined) return;
+        if (m.kind === 'strength') {
+          setStrengthWeightRef.current(m.day, m.ex, m.si, t);
+        } else {
+          setCardioMinutesRef.current(m.day, m.ex, t);
+        }
+      }, DRAFT_INPUT_DEBOUNCE_MS);
+      draftDebounceTimersRef.current.set(fieldKey, tid);
+    },
+    [],
+  );
+
+  const persistDay = useCallback(
+    async (day: DayOfWeek, draftMap?: DraftMap) => {
+      flushAllPendingDraftInputs();
+      await new Promise<void>((r) => setTimeout(r, 0));
+      clearAutosaveTimer(day);
+      const map = draftMap ?? draftRef.current;
+      const exercises = buildWeekLogExercises(day, program, map);
+      await saveWeekDayLogRemote(weekMonday, day, exercises);
+    },
+    [clearAutosaveTimer, flushAllPendingDraftInputs, program, weekMonday],
+  );
+
+  const queueAutosave = useCallback(
+    (d: DayOfWeek) => {
+      if (program[d].length === 0) return;
+      const wk = formatLocalDate(weekMonday);
+      clearAutosaveTimer(d);
+      const t = setTimeout(() => {
+        autosaveTimers.current.delete(d);
+        if (formatLocalDate(weekMonday) !== wk) return;
+        void persistDay(d).catch((e) => console.error('Auto-save failed', e));
+      }, AUTOSAVE_MS);
+      autosaveTimers.current.set(d, t);
+    },
+    [clearAutosaveTimer, persistDay, program, weekMonday],
+  );
+
+  queueAutosaveRef.current = queueAutosave;
 
   const lastWeekSetKg = (day: DayOfWeek, exerciseKey: string, setIdx: number): number | null => {
     const prev = prevLogs[day];
@@ -339,15 +407,17 @@ export function WeekViewScreen() {
   };
 
   const toggleExerciseComplete = async (day: DayOfWeek, ex: ProgramExercise) => {
+    flushAllPendingDraftInputs();
+    await new Promise<void>((r) => setTimeout(r, 0));
     const key = makeDraftKey(day, ex.exerciseKey);
-    const stored = draft[key];
+    const stored = draftRef.current[key];
     const base = stored ?? defaultDraftEntry(ex);
     const nextCompleted = !base.completed;
     const nextEntry: DraftEntry =
       base.kind === 'strength'
         ? { ...base, completed: nextCompleted }
         : { ...base, completed: nextCompleted };
-    const nextDraft: DraftMap = { ...draft, [key]: nextEntry };
+    const nextDraft: DraftMap = { ...draftRef.current, [key]: nextEntry };
     setDraft(nextDraft);
     try {
       // Pass nextDraft so we don't persist stale React state (setDraft is async).
@@ -591,6 +661,9 @@ export function WeekViewScreen() {
                           style={styles.numInput}
                           keyboardType="decimal-pad"
                           blurOnSubmit={false}
+                          autoCorrect={false}
+                          autoCapitalize="none"
+                          {...(Platform.OS === 'ios' ? { textContentType: 'none' as const } : {})}
                           value={
                             weightTextOverlay[cardioOverlayKey] ?? String(getCardioMinutes(day, ex))
                           }
@@ -602,7 +675,7 @@ export function WeekViewScreen() {
                           }}
                           onChangeText={(t) => {
                             setWeightTextOverlay((prev) => ({ ...prev, [cardioOverlayKey]: t }));
-                            setCardioMinutes(day, ex, t);
+                            scheduleDebouncedDraftInput(cardioOverlayKey, { kind: 'cardio', day, ex }, t);
                           }}
                         />
                         <Text style={styles.unit}>min</Text>
@@ -638,6 +711,9 @@ export function WeekViewScreen() {
                                 style={styles.numInput}
                                 keyboardType="decimal-pad"
                                 blurOnSubmit={false}
+                                autoCorrect={false}
+                                autoCapitalize="none"
+                                {...(Platform.OS === 'ios' ? { textContentType: 'none' as const } : {})}
                                 value={
                                   weightTextOverlay[setOverlayKey] ??
                                   String(getStrengthWeight(day, ex, si))
@@ -650,7 +726,11 @@ export function WeekViewScreen() {
                                 }}
                                 onChangeText={(t) => {
                                   setWeightTextOverlay((prev) => ({ ...prev, [setOverlayKey]: t }));
-                                  setStrengthWeight(day, ex, si, t);
+                                  scheduleDebouncedDraftInput(
+                                    setOverlayKey,
+                                    { kind: 'strength', day, ex, si },
+                                    t,
+                                  );
                                 }}
                               />
                               <Text style={styles.unit}>kg</Text>
